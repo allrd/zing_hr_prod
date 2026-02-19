@@ -150,7 +150,7 @@ import os
 
 # -----------------------------------------------------------
 # TESSERACT PATH
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\VikasTiwari\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+#pytesseract.pytesseract.tesseract_cmd = r"C:\Users\VikasTiwari\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 # -----------------------------------------------------------
 # POPPLER PATH FOR SCANNED PDF → IMAGE CONVERSION
