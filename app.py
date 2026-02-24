@@ -9,7 +9,7 @@ from dateutil import parser
 VALID_USERNAME = "UATUser"
 VALID_PASSWORD = "Admin"
 
-# vikas
+# vikas1
 # external extractors
 from total import extract_total, extract_text_full
 from invoice import extract_invoice
