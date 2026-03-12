@@ -111,13 +111,13 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
                 "invoice_number": inv
             }
 
-        if amt > daily_limit:
-            return {
-                "status": "DAILY_LIMIT_EXCEEDED",
-                "invoice_number": inv,
-                "amount": amt,
-                "daily_limit": daily_limit
-            }
+        #if amt > daily_limit:
+         #   return {
+         #       "status": "DAILY_LIMIT_EXCEEDED",
+         #       "invoice_number": inv,
+         #       "amount": amt,
+         #       "daily_limit": daily_limit
+          #  }
 
         total_excel_amount += amt
 
