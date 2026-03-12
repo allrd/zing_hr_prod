@@ -144,7 +144,7 @@ def process_claim(data):
 
     claim = data.get("Claim", {})
     emp = claim.get("Employee_Code")
-    c_id = clam.get("Claim_ID")
+    c_id = claim.get("Claim_ID")
     total_expected = float(claim.get("Total_Bill_Amount", 0))
 
     vouchers = claim.get("Vouchers", [])
