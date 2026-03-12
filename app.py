@@ -86,7 +86,7 @@ def insert_into_excel(records):
 
 
 # ================= DAILY EXPENSE (EXCEL) =================
-def process_daily_expense_excel(path, emp, ctype, voucher, db_df):
+def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
     df = pd.read_excel(path)
 
     required_cols = ["Invoice_No", "Date", "Total_Amount"]
@@ -126,7 +126,9 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df):
             "Invoice_No": inv,
             "Date": str(date_obj),
             "Total_Amount": amt,
-            "Claim_Type": ctype
+            "Claim_Type": ctype,
+            "Claim_ID":c_id,
+            "Status":"Pass"
         })
 
     if total_excel_amount > voucher_amount:
@@ -177,7 +179,7 @@ def process_claim(data):
                     }
 
                 result = process_daily_expense_excel(
-                    path, emp, ctype, v, db_df
+                    path, emp, ctype, v, db_df,c_id
                 )
 
                 if "status" in result and result["status"] != "OK":
