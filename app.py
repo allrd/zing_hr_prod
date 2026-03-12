@@ -76,7 +76,9 @@ def insert_into_excel(records):
             "Invoice_No",
             "Date",
             "Total_Amount",
-            "Claim_Type"
+            "Claim_Type",
+            "Claim_ID",
+            "Status"
         ])
 
     df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
@@ -142,6 +144,7 @@ def process_claim(data):
 
     claim = data.get("Claim", {})
     emp = claim.get("Employee_Code")
+    c_id = clam.get("Claim_ID")
     total_expected = float(claim.get("Total_Bill_Amount", 0))
 
     vouchers = claim.get("Vouchers", [])
@@ -213,7 +216,9 @@ def process_claim(data):
                     "Invoice_No": inv,
                     "Date": str(invoice_date),
                     "Total_Amount": total,
-                    "Claim_Type": ctype
+                    "Claim_Type": ctype,
+                    "Claim_ID":c_id,
+                    "Status":"Pass"
                 })
 
         grand_total += voucher_total
