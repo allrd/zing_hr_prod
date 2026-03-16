@@ -205,118 +205,71 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
 # ================= CLAIM PROCESSOR =================
 def process_claim(data):
-
     claim = data.get("Claim", {})
-
     emp = claim.get("Employee_Code")
     c_id = claim.get("Claim_ID")
     total_expected = float(claim.get("Total_Bill_Amount", 0))
-
     vouchers = claim.get("Vouchers", [])
+
+    db_df = pd.read_excel("claim.xlsx") if os.path.exists("claim.xlsx") else pd.DataFrame()
 
     grand_total = 0
     all_records = []
 
     for v in vouchers:
-
         subtype = v.get("Sub_Type")
         ctype = v.get("Sub_Type")
-
         voucher_total = 0
-
         attachments = v.get("Attachments", [])
 
         for att in attachments:
-
             path = decode_base64_file(att.get("base64File"))
 
             try:
-
+                # DAILY EXPENSE
                 if subtype == "Daily_Expense":
 
                     if not path.endswith(".xlsx"):
-
-                        all_records.append({
-                            "HASH": str(uuid.uuid4()),
-                            "Employee_Code": emp,
-                            "Invoice_No": "N/A",
-                            "Date": "",
-                            "Total_Amount": 0,
-                            "Claim_Type": ctype,
-                            "Claim_ID": c_id,
-                            "Status": "Rejected",
-                            "Remark": "Daily Expense requires Excel attachment"
-                        })
-
-                        continue
+                        return {
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Daily_Expense requires Excel attachment"
+                        }
 
                     result = process_daily_expense_excel(
-                        path, emp, ctype, v, None, c_id
+                        path,
+                        emp,
+                        ctype,
+                        v,
+                        db_df,
+                        c_id
                     )
 
                     if "status" in result and result["status"] != "OK":
+                        return result
 
-                        all_records.append({
-                            "HASH": str(uuid.uuid4()),
-                            "Employee_Code": emp,
-                            "Invoice_No": result.get("invoice_number", "N/A"),
-                            "Date": "",
-                            "Total_Amount": 0,
-                            "Claim_Type": ctype,
-                            "Claim_ID": c_id,
-                            "Status": "Rejected",
-                            "Remark": result.get("status")
-                        })
-
-                        continue
-
-                    for rec in result["records"]:
-                        rec["Remark"] = "Approved"
-                        all_records.append(rec)
-
+                    all_records.extend(result["records"])
                     voucher_total += result["total"]
 
+                # INDIVIDUAL EXPENSE
                 elif subtype == "Individual_Expense":
 
                     if path.endswith(".xlsx"):
-
-                        all_records.append({
-                            "HASH": str(uuid.uuid4()),
-                            "Employee_Code": emp,
-                            "Invoice_No": "N/A",
-                            "Date": "",
-                            "Total_Amount": 0,
-                            "Claim_Type": ctype,
-                            "Claim_ID": c_id,
-                            "Status": "Rejected",
-                            "Remark": "Individual Expense requires PDF/Image"
-                        })
-
-                        continue
+                        return {
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Individual_Expense requires PDF or Image"
+                        }
 
                     text = extract_text_full(path)
-
                     inv = extract_invoice(text)
                     date_text = extract_date_from_text(text)
                     invoice_date = normalize_date(date_text)
-
                     total = float(extract_total(text) or 0)
 
                     if check_duplicate(emp, inv, str(invoice_date), total):
-
-                        all_records.append({
-                            "HASH": str(uuid.uuid4()),
-                            "Employee_Code": emp,
-                            "Invoice_No": inv,
-                            "Date": str(invoice_date),
-                            "Total_Amount": total,
-                            "Claim_Type": ctype,
-                            "Claim_ID": c_id,
-                            "Status": "Rejected",
-                            "Remark": "Duplicate Claim"
-                        })
-
-                        continue
+                        return {
+                            "status": "DUPLICATE_CLAIM",
+                            "invoice_number": inv
+                        }
 
                     voucher_total += total
 
@@ -328,8 +281,7 @@ def process_claim(data):
                         "Total_Amount": total,
                         "Claim_Type": ctype,
                         "Claim_ID": c_id,
-                        "Status": "Approved",
-                        "Remark": "Approved"
+                        "Status": "Approved"
                     })
 
             finally:
@@ -339,27 +291,20 @@ def process_claim(data):
         grand_total += voucher_total
 
     if grand_total > total_expected:
-
-        all_records.append({
-            "HASH": str(uuid.uuid4()),
-            "Employee_Code": emp,
-            "Invoice_No": "TOTAL",
-            "Date": "",
-            "Total_Amount": grand_total,
-            "Claim_Type": "Claim_Total",
-            "Claim_ID": c_id,
-            "Status": "Rejected",
-            "Remark": "Claim total mismatch"
-        })
+        return {
+            "status": "CLAIM_TOTAL_MISMATCH",
+            "total_attachments_amount": grand_total
+        }
 
     insert_into_excel(all_records)
     insert_into_dynamodb(all_records)
 
     return {
-        "status": "PROCESSED",
+        "status": "NEW_CLAIM",
         "records_saved": len(all_records),
-        "approved_amount": grand_total
+        "total_amount": grand_total
     }
+
 
 # ================= REJECT / APPROVE CLAIM =================
 def reject_claim(body):
