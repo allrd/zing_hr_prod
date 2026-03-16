@@ -64,19 +64,46 @@ def decode_base64_file(base64_string):
 
 
 # ================= DUPLICATE CHECK =================
-def check_duplicate(df, emp, inv, date, amt):
+# def check_duplicate(df, emp, inv, date, amt):
 
-    if df.empty:
-        return False
+#     if df.empty:
+#         return False
 
-    dup = df[
-        (df["Employee_Code"] == emp) &
-        (df["Invoice_No"] == inv) &
-        (df["Date"] == date) &
-        (abs(df["Total_Amount"] - amt) <= 5)
-    ]
+#     dup = df[
+#         (df["Employee_Code"] == emp) &
+#         (df["Invoice_No"] == inv) &
+#         (df["Date"] == date) &
+#         (abs(df["Total_Amount"] - amt) <= 5)
+#     ]
 
-    return not dup.empty
+#     return not dup.empty
+
+def check_duplicate(emp, inv, date, amt):
+
+    response = table.scan(
+        FilterExpression="Employee_Code = :emp AND Invoice_No = :inv AND #d = :date AND #s = :status",
+        ExpressionAttributeNames={
+            "#d": "Date",
+            "#s": "Status"
+        },
+        ExpressionAttributeValues={
+            ":emp": emp,
+            ":inv": inv,
+            ":date": date,
+            ":status": "Approved"
+        }
+    )
+
+    items = response.get("Items", [])
+
+    for item in items:
+        existing_amount = float(item.get("Total_Amount", 0))
+
+        # Allow small amount difference tolerance
+        if abs(existing_amount - amt) <= 5:
+            return True
+
+    return False
 
 
 # ================= SAVE TO EXCEL =================
@@ -145,7 +172,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
         date_obj = normalize_date(row["Date"])
         amt = float(row["Total_Amount"])
 
-        if check_duplicate(db_df, emp, inv, str(date_obj), amt):
+        if check_duplicate(emp, inv, str(date_obj), amt):
             return {
                 "status": "DUPLICATE_CLAIM",
                 "invoice_number": inv
@@ -242,7 +269,7 @@ def process_claim(data):
 
                     total = float(extract_total(text) or 0)
 
-                    if check_duplicate(db_df, emp, inv, str(invoice_date), total):
+                    if check_duplicate(emp, inv, str(invoice_date), total):
                         return {
                             "status": "DUPLICATE_CLAIM",
                             "invoice_number": inv
