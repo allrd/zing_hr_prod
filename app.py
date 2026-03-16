@@ -4,6 +4,16 @@ import uuid
 import pandas as pd
 from flask import Flask, request, jsonify
 from dateutil import parser
+import boto3
+from decimal import Decimal
+
+# ================= DYNAMODB SETUP =================
+dynamodb = boto3.resource(
+    "dynamodb",
+    region_name="ap-south-1"   # change if needed
+)
+
+table = dynamodb.Table("CLAIM-DATA")
 
 # ================= USER AUTH =================
 VALID_USERNAME = "UATUser"
@@ -84,6 +94,22 @@ def insert_into_excel(records):
     df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
     df.to_excel(DB, index=False)
 
+# ================= SAVE TO dynamodb =================
+def insert_into_dynamodb(records):
+
+    for rec in records:
+
+        item = {
+            "Claim_ID": str(rec["Claim_ID"]),
+            "Invoice_No": str(rec["Invoice_No"]),
+            "Employee_Code": str(rec["Employee_Code"]),
+            "Date": str(rec["Date"]),
+            "Claim_Type": str(rec["Claim_Type"]),
+            "Status": str(rec["Status"]),
+            "Total_Amount": Decimal(str(rec["Total_Amount"]))
+        }
+
+        table.put_item(Item=item)
 
 # ================= DAILY EXPENSE (EXCEL) =================
 def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
@@ -232,6 +258,7 @@ def process_claim(data):
         }
 
     insert_into_excel(all_records)
+    insert_into_dynamodb(all_records)
 
     return {
         "status": "NEW_CLAIM",
@@ -290,6 +317,23 @@ def reject_claim(body):
 
     # Save back to Excel
     df.to_excel(DB, index=False)
+
+    # Update status in DynamoDB
+    for _, row in df[mask].iterrows():
+    
+        table.update_item(
+            Key={
+                "Claim_ID": str(row["Claim_ID"]),
+                "Invoice_No": str(row["Invoice_No"])
+            },
+            UpdateExpression="SET #s = :val",
+            ExpressionAttributeNames={
+                "#s": "Status"
+            },
+            ExpressionAttributeValues={
+                ":val": updated_status
+            }
+        )
 
     return {
         "status": "SUCCESS",
