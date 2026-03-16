@@ -288,6 +288,7 @@ def process_claim(data):
                         "Claim_Type": ctype,
                         "Claim_ID": c_id,
                         "Status": "Approved"
+                        "Remark":"test"
                     })
 
             finally:
