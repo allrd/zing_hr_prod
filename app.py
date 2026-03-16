@@ -240,6 +240,9 @@ def process_claim(data):
     }
 
 
+def reject_claim(body):
+    return body
+
 # ================= FLASK API =================
 app = Flask(__name__)
 
@@ -277,7 +280,7 @@ def reject_api():
     # ===================================================
 
     try:
-        return "Hello Rohit"
+        return jsonify(reject_claim(request.get_json()))
     except Exception as e:
         return jsonify({"status": "ERROR1", "message": str(e)})
 
