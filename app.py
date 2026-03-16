@@ -314,7 +314,6 @@ def process_claim(data):
 
 # ================= REJECT / APPROVE CLAIM =================
 def reject_claim(body):
-
     claim_id = body.get("Claim_ID")
     updated_status = str(body.get("Status", "")).capitalize()
 
@@ -350,23 +349,24 @@ def reject_claim(body):
             "message": f"No records found for Claim_ID {claim_id}"
         }
 
+    # Update status in Excel
     df.loc[mask, "Status"] = updated_status
     df.to_excel(DB, index=False)
 
-   for _, row in df[mask].iterrows():
-       table.update_item(
-        Key={
-            "HASH": str(row["HASH"])
-        },
-        UpdateExpression="SET #s = :val, Modified_Time = :modified_time",
-        ExpressionAttributeNames={
-            "#s": "Status"
-        },
-        ExpressionAttributeValues={
-            ":val": updated_status,
-            ":modified_time": get_current_timestamp()
-        }
-    )
+    # Update status in DynamoDB
+    for _, row in df[mask].iterrows():
+        table.update_item(
+            Key={
+                "HASH": str(row["HASH"])
+            },
+            UpdateExpression="SET #s = :val",
+            ExpressionAttributeNames={
+                "#s": "Status"
+            },
+            ExpressionAttributeValues={
+                ":val": updated_status
+            }
+        )
 
     return {
         "status": "SUCCESS",
