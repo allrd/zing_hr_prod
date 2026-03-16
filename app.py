@@ -262,6 +262,26 @@ def api():
     except Exception as e:
         return jsonify({"status": "ERROR1", "message": str(e)})
 
+#==============Status Reject System ===============
+@app.route("/reject",methods=["POST"])
+def reject_api():
+    # ================= AUTH VALIDATION =================
+    username = request.headers.get("X-Username")
+    password = request.headers.get("X-Password")
+
+    if not username or not password:
+        return jsonify({"error": "Authentication headers missing"}), 401
+
+    if username != VALID_USERNAME or password != VALID_PASSWORD:
+        return jsonify({"error": "Invalid username or password"}), 401
+    # ===================================================
+
+    try:
+        return "Hello Rohit"
+    except Exception as e:
+        return jsonify({"status": "ERROR1", "message": str(e)})
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)
