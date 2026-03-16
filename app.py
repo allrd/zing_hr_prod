@@ -287,7 +287,7 @@ def process_claim(data):
                         "Total_Amount": total,
                         "Claim_Type": ctype,
                         "Claim_ID": c_id,
-                        "Status": "Approved"
+                        "Status": "Approved",
                         "Remark":"test"
                     })
 
