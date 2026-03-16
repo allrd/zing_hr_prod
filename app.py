@@ -388,7 +388,7 @@ def api():
         return jsonify({"status": "ERROR1", "message": str(e)})
 
 
-@app.route("/reject", methods=["POST"])
+@app.route("/status-update", methods=["POST"])
 def reject_api():
 
     username = request.headers.get("X-Username")
