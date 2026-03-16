@@ -6,12 +6,11 @@ from flask import Flask, request, jsonify
 from dateutil import parser
 import boto3
 from decimal import Decimal
-import uuid
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource(
     "dynamodb",
-    region_name="ap-south-1"   # change if needed
+    region_name="ap-south-1"
 )
 
 table = dynamodb.Table("CLAIM-DATA")
@@ -20,7 +19,6 @@ table = dynamodb.Table("CLAIM-DATA")
 VALID_USERNAME = "UATUser"
 VALID_PASSWORD = "Admin"
 
-# Rohit
 # external extractors
 from total import extract_total, extract_text_full
 from invoice import extract_invoice
@@ -39,6 +37,10 @@ def normalize_date(date_str):
 
 # ================= BASE64 DECODER =================
 def decode_base64_file(base64_string):
+
+    if not base64_string:
+        raise ValueError("Attachment base64 missing")
+
     if "base64," in base64_string:
         base64_string = base64_string.split("base64,")[1]
 
@@ -63,6 +65,7 @@ def decode_base64_file(base64_string):
 
 # ================= DUPLICATE CHECK =================
 def check_duplicate(df, emp, inv, date, amt):
+
     if df.empty:
         return False
 
@@ -72,17 +75,20 @@ def check_duplicate(df, emp, inv, date, amt):
         (df["Date"] == date) &
         (abs(df["Total_Amount"] - amt) <= 5)
     ]
+
     return not dup.empty
 
 
 # ================= SAVE TO EXCEL =================
 def insert_into_excel(records):
+
     DB = "claim.xlsx"
 
     if os.path.exists(DB):
         df = pd.read_excel(DB)
     else:
         df = pd.DataFrame(columns=[
+            "HASH",
             "Employee_Code",
             "Invoice_No",
             "Date",
@@ -95,41 +101,46 @@ def insert_into_excel(records):
     df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
     df.to_excel(DB, index=False)
 
-# ================= SAVE TO dynamodb =================
+
+# ================= SAVE TO DYNAMODB =================
 def insert_into_dynamodb(records):
 
-    for rec in records:
-        primary_Key = str(uuid.uuid4())
-        
-        item = {
-            "HASH": primary_Key,
-            "Claim_ID": str(rec["Claim_ID"]),
-            "Invoice_No": str(rec["Invoice_No"]),
-            "Employee_Code": str(rec["Employee_Code"]),
-            "Date": str(rec["Date"]),
-            "Claim_Type": str(rec["Claim_Type"]),
-            "Status": str(rec["Status"]),
-            "Total_Amount": Decimal(str(rec["Total_Amount"]))
-        }
+    with table.batch_writer() as batch:
 
-        table.put_item(Item=item)
+        for rec in records:
 
-# ================= DAILY EXPENSE (EXCEL) =================
-def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
+            item = {
+                "HASH": rec["HASH"],
+                "Claim_ID": str(rec["Claim_ID"]),
+                "Invoice_No": str(rec["Invoice_No"]),
+                "Employee_Code": str(rec["Employee_Code"]),
+                "Date": str(rec["Date"]),
+                "Claim_Type": str(rec["Claim_Type"]),
+                "Status": str(rec["Status"]),
+                "Total_Amount": Decimal(str(rec["Total_Amount"]))
+            }
+
+            batch.put_item(Item=item)
+
+
+# ================= DAILY EXPENSE =================
+def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
+
     df = pd.read_excel(path)
 
     required_cols = ["Invoice_No", "Date", "Total_Amount"]
+
     for col in required_cols:
         if col not in df.columns:
             return {"status": "ERROR", "message": f"{col} column missing in Excel"}
 
-    daily_limit = float(voucher.get("Daily_Limit", 0))
     voucher_amount = float(voucher.get("Bill_Amount", 0))
 
     total_excel_amount = 0
     records = []
 
     for _, row in df.iterrows():
+
         inv = str(row["Invoice_No"])
         date_obj = normalize_date(row["Date"])
         amt = float(row["Total_Amount"])
@@ -140,24 +151,17 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
                 "invoice_number": inv
             }
 
-        #if amt > daily_limit:
-         #   return {
-         #       "status": "DAILY_LIMIT_EXCEEDED",
-         #       "invoice_number": inv,
-         #       "amount": amt,
-         #       "daily_limit": daily_limit
-          #  }
-
         total_excel_amount += amt
 
         records.append({
+            "HASH": str(uuid.uuid4()),
             "Employee_Code": emp,
             "Invoice_No": inv,
             "Date": str(date_obj),
             "Total_Amount": amt,
             "Claim_Type": ctype,
-            "Claim_ID":c_id,
-            "Status":"Approved"
+            "Claim_ID": c_id,
+            "Status": "Approved"
         })
 
     if total_excel_amount > voucher_amount:
@@ -174,11 +178,13 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
 def process_claim(data):
 
     claim = data.get("Claim", {})
+
     emp = claim.get("Employee_Code")
     c_id = claim.get("Claim_ID")
     total_expected = float(claim.get("Total_Bill_Amount", 0))
 
     vouchers = claim.get("Vouchers", [])
+
     db_df = pd.read_excel("claim.xlsx") if os.path.exists("claim.xlsx") else pd.DataFrame()
 
     grand_total = 0
@@ -188,69 +194,76 @@ def process_claim(data):
 
         subtype = v.get("Sub_Type")
         ctype = v.get("Sub_Type")
+
         voucher_total = 0
 
         attachments = v.get("Attachments", [])
-        if not attachments:
-            continue
 
         for att in attachments:
 
             path = decode_base64_file(att.get("base64File"))
 
-            # DAILY EXPENSE
-            if subtype == "Daily_Expense":
+            try:
 
-                if not path.endswith(".xlsx"):
-                    return {
-                        "status": "INVALID_ATTACHMENT",
-                        "message": "Daily_Expense requires Excel attachment"
-                    }
+                # DAILY EXPENSE
+                if subtype == "Daily_Expense":
 
-                result = process_daily_expense_excel(
-                    path, emp, ctype, v, db_df,c_id
-                )
+                    if not path.endswith(".xlsx"):
+                        return {
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Daily_Expense requires Excel attachment"
+                        }
 
-                if "status" in result and result["status"] != "OK":
-                    return result
+                    result = process_daily_expense_excel(
+                        path, emp, ctype, v, db_df, c_id
+                    )
 
-                all_records.extend(result["records"])
-                voucher_total += result["total"]
-                continue
+                    if "status" in result and result["status"] != "OK":
+                        return result
 
-            # INDIVIDUAL EXPENSE
-            if subtype == "Individual_Expense":
+                    all_records.extend(result["records"])
+                    voucher_total += result["total"]
 
-                if path.endswith(".xlsx"):
-                    return {
-                        "status": "INVALID_ATTACHMENT",
-                        "message": "Individual_Expense requires PDF or Image"
-                    }
+                # INDIVIDUAL EXPENSE
+                elif subtype == "Individual_Expense":
 
-                text = extract_text_full(path)
+                    if path.endswith(".xlsx"):
+                        return {
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Individual_Expense requires PDF or Image"
+                        }
 
-                inv = extract_invoice(text)
-                date_text = extract_date_from_text(text)
-                invoice_date = normalize_date(date_text)
-                total = float(extract_total(text) or 0)
+                    text = extract_text_full(path)
 
-                if check_duplicate(db_df, emp, inv, str(invoice_date), total):
-                    return {
-                        "status": "DUPLICATE_CLAIM",
-                        "invoice_number": inv
-                    }
+                    inv = extract_invoice(text)
+                    date_text = extract_date_from_text(text)
 
-                voucher_total += total
+                    invoice_date = normalize_date(date_text)
 
-                all_records.append({
-                    "Employee_Code": emp,
-                    "Invoice_No": inv,
-                    "Date": str(invoice_date),
-                    "Total_Amount": total,
-                    "Claim_Type": ctype,
-                    "Claim_ID":c_id,
-                    "Status":"Approved"
-                })
+                    total = float(extract_total(text) or 0)
+
+                    if check_duplicate(db_df, emp, inv, str(invoice_date), total):
+                        return {
+                            "status": "DUPLICATE_CLAIM",
+                            "invoice_number": inv
+                        }
+
+                    voucher_total += total
+
+                    all_records.append({
+                        "HASH": str(uuid.uuid4()),
+                        "Employee_Code": emp,
+                        "Invoice_No": inv,
+                        "Date": str(invoice_date),
+                        "Total_Amount": total,
+                        "Claim_Type": ctype,
+                        "Claim_ID": c_id,
+                        "Status": "Approved"
+                    })
+
+            finally:
+                if os.path.exists(path):
+                    os.remove(path)
 
         grand_total += voucher_total
 
@@ -270,11 +283,12 @@ def process_claim(data):
     }
 
 
+# ================= REJECT / APPROVE CLAIM =================
 def reject_claim(body):
-    claim_id = body.get("Claim_ID")
-    updated_status = body.get("Status")
 
-    # ================= STATUS VALIDATION =================
+    claim_id = body.get("Claim_ID")
+    updated_status = str(body.get("Status", "")).capitalize()
+
     if not updated_status:
         return {
             "status": "ERROR",
@@ -288,7 +302,6 @@ def reject_claim(body):
             "status": "ERROR",
             "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
         }
-    # ====================================================
 
     DB = "claim.xlsx"
 
@@ -300,13 +313,6 @@ def reject_claim(body):
 
     df = pd.read_excel(DB)
 
-    if "Claim_ID" not in df.columns:
-        return {
-            "status": "ERROR",
-            "message": "Claim_ID column missing in database"
-        }
-
-    # Find matching claim rows
     mask = df["Claim_ID"] == claim_id
 
     if not mask.any():
@@ -315,13 +321,9 @@ def reject_claim(body):
             "message": f"No records found for Claim_ID {claim_id}"
         }
 
-    # Update status
     df.loc[mask, "Status"] = updated_status
-
-    # Save back to Excel
     df.to_excel(DB, index=False)
 
-    # Update status in DynamoDB
     for _, row in df[mask].iterrows():
 
         table.update_item(
@@ -336,54 +338,46 @@ def reject_claim(body):
                 ":val": updated_status
             }
         )
-        
+
     return {
         "status": "SUCCESS",
         "message": f"Claim {claim_id} updated to {updated_status}",
         "rows_updated": int(mask.sum())
     }
 
+
 # ================= FLASK API =================
 app = Flask(__name__)
+
 
 @app.route("/process-invoice", methods=["POST"])
 def api():
 
-    # ================= AUTH VALIDATION =================
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
-    if not username or not password:
-        return jsonify({"error": "Authentication headers missing"}), 401
-
     if username != VALID_USERNAME or password != VALID_PASSWORD:
         return jsonify({"error": "Invalid username or password"}), 401
-    # ===================================================
 
     try:
         return jsonify(process_claim(request.get_json()))
     except Exception as e:
         return jsonify({"status": "ERROR1", "message": str(e)})
 
-#==============Status Reject System ===============
-@app.route("/reject",methods=["POST"])
+
+@app.route("/reject", methods=["POST"])
 def reject_api():
-    # ================= AUTH VALIDATION =================
+
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
-    if not username or not password:
-        return jsonify({"error": "Authentication headers missing"}), 401
-
     if username != VALID_USERNAME or password != VALID_PASSWORD:
         return jsonify({"error": "Invalid username or password"}), 401
-    # ===================================================
 
     try:
         return jsonify(reject_claim(request.get_json()))
     except Exception as e:
         return jsonify({"status": "ERROR1", "message": str(e)})
-
 
 
 if __name__ == "__main__":
