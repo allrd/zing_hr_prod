@@ -241,7 +241,7 @@ def process_claim(data):
 
 
 def reject_claim(body):
-    claim = data.get("Claim", {})
+    claim = body.get("Claim", {})
     claim_id = claim.get("Claim_ID")
     return claim_id
 
