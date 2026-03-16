@@ -241,7 +241,9 @@ def process_claim(data):
 
 
 def reject_claim(body):
-    return body
+    claim = data.get("Claim", {})
+    claim_id = claim.get("Claim_ID")
+    return claim_id
 
 # ================= FLASK API =================
 app = Flask(__name__)
