@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from dateutil import parser
 import boto3
 from decimal import Decimal
+from datetime import datetime, timezone
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource(
@@ -34,6 +35,9 @@ def normalize_date(date_str):
     except:
         return None
 
+# ================= get_current_timestamp =================
+def get_current_timestamp():
+    return datetime.now(timezone.utc).isoformat()
 
 # ================= BASE64 DECODER =================
 def decode_base64_file(base64_string):
@@ -134,9 +138,9 @@ def insert_into_excel(records):
 def insert_into_dynamodb(records):
 
     with table.batch_writer() as batch:
-
+        
         for rec in records:
-
+            current_time = get_current_timestamp()
             item = {
                 "HASH": rec["HASH"],
                 "Claim_ID": str(rec["Claim_ID"]),
@@ -146,7 +150,9 @@ def insert_into_dynamodb(records):
                 "Claim_Type": str(rec["Claim_Type"]),
                 "Status": str(rec["Status"]),
                 "Remark": str(rec["Remark"]),
-                "Total_Amount": Decimal(str(rec["Total_Amount"]))
+                "Total_Amount": Decimal(str(rec["Total_Amount"])),
+                "Created_Time": current_time,
+                "Modified_Time": current_time
             }
 
             batch.put_item(Item=item)
@@ -347,20 +353,21 @@ def reject_claim(body):
     df.loc[mask, "Status"] = updated_status
     df.to_excel(DB, index=False)
 
-    for _, row in df[mask].iterrows():
+   for _, row in df[mask].iterrows():
 
-        table.update_item(
-            Key={
-                "HASH": str(row["HASH"])
-            },
-            UpdateExpression="SET #s = :val",
-            ExpressionAttributeNames={
-                "#s": "Status"
-            },
-            ExpressionAttributeValues={
-                ":val": updated_status
-            }
-        )
+    table.update_item(
+        Key={
+            "HASH": str(row["HASH"])
+        },
+        UpdateExpression="SET #s = :val, Modified_Time = :modified_time",
+        ExpressionAttributeNames={
+            "#s": "Status"
+        },
+        ExpressionAttributeValues={
+            ":val": updated_status,
+            ":modified_time": get_current_timestamp()
+        }
+    )
 
     return {
         "status": "SUCCESS",
