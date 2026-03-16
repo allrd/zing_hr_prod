@@ -323,11 +323,10 @@ def reject_claim(body):
 
     # Update status in DynamoDB
     for _, row in df[mask].iterrows():
-    
+
         table.update_item(
             Key={
-                "Claim_ID": str(row["Claim_ID"]),
-                "Invoice_No": str(row["Invoice_No"])
+                "HASH": str(row["HASH"])
             },
             UpdateExpression="SET #s = :val",
             ExpressionAttributeNames={
@@ -337,7 +336,7 @@ def reject_claim(body):
                 ":val": updated_status
             }
         )
-
+        
     return {
         "status": "SUCCESS",
         "message": f"Claim {claim_id} updated to {updated_status}",
