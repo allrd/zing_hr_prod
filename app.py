@@ -354,8 +354,7 @@ def reject_claim(body):
     df.to_excel(DB, index=False)
 
    for _, row in df[mask].iterrows():
-
-    table.update_item(
+       table.update_item(
         Key={
             "HASH": str(row["HASH"])
         },
