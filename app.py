@@ -128,7 +128,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df,c_id):
             "Total_Amount": amt,
             "Claim_Type": ctype,
             "Claim_ID":c_id,
-            "Status":"Pass"
+            "Status":"Approved"
         })
 
     if total_excel_amount > voucher_amount:
@@ -220,7 +220,7 @@ def process_claim(data):
                     "Total_Amount": total,
                     "Claim_Type": ctype,
                     "Claim_ID":c_id,
-                    "Status":"Pass"
+                    "Status":"Approved"
                 })
 
         grand_total += voucher_total
@@ -242,6 +242,23 @@ def process_claim(data):
 
 def reject_claim(body):
     claim_id = body.get("Claim_ID")
+    updated_status = body.get("Status")
+
+    # ================= STATUS VALIDATION =================
+    if not updated_status:
+        return {
+            "status": "ERROR",
+            "message": "Status cannot be empty. Allowed values: Rejected, Approved"
+        }
+
+    allowed_status = ["Rejected", "Approved"]
+
+    if updated_status not in allowed_status:
+        return {
+            "status": "ERROR",
+            "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
+        }
+    # ====================================================
 
     DB = "claim.xlsx"
 
@@ -269,14 +286,14 @@ def reject_claim(body):
         }
 
     # Update status
-    df.loc[mask, "Status"] = "Rejected"
+    df.loc[mask, "Status"] = updated_status
 
     # Save back to Excel
     df.to_excel(DB, index=False)
 
     return {
         "status": "SUCCESS",
-        "message": f"Claim {claim_id} rejected successfully",
+        "message": f"Claim {claim_id} updated to {updated_status}",
         "rows_updated": int(mask.sum())
     }
 
