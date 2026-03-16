@@ -242,7 +242,43 @@ def process_claim(data):
 
 def reject_claim(body):
     claim_id = body.get("Claim_ID")
-    return claim_id
+
+    DB = "claim.xlsx"
+
+    if not os.path.exists(DB):
+        return {
+            "status": "ERROR",
+            "message": "Database file not found"
+        }
+
+    df = pd.read_excel(DB)
+
+    if "Claim_ID" not in df.columns:
+        return {
+            "status": "ERROR",
+            "message": "Claim_ID column missing in database"
+        }
+
+    # Find matching claim rows
+    mask = df["Claim_ID"] == claim_id
+
+    if not mask.any():
+        return {
+            "status": "NOT_FOUND",
+            "message": f"No records found for Claim_ID {claim_id}"
+        }
+
+    # Update status
+    df.loc[mask, "Status"] = "Rejected"
+
+    # Save back to Excel
+    df.to_excel(DB, index=False)
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Claim {claim_id} rejected successfully",
+        "rows_updated": int(mask.sum())
+    }
 
 # ================= FLASK API =================
 app = Flask(__name__)
