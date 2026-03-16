@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from dateutil import parser
 import boto3
 from decimal import Decimal
+import uuid
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource(
@@ -98,8 +99,10 @@ def insert_into_excel(records):
 def insert_into_dynamodb(records):
 
     for rec in records:
-
+        primary_Key = str(uuid.uuid4())
+        
         item = {
+            "HASH": primary_Key,
             "Claim_ID": str(rec["Claim_ID"]),
             "Invoice_No": str(rec["Invoice_No"]),
             "Employee_Code": str(rec["Employee_Code"]),
