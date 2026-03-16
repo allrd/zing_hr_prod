@@ -7,6 +7,8 @@ from dateutil import parser
 import boto3
 from decimal import Decimal
 from datetime import datetime, timezone
+from boto3.dynamodb.conditions import Attr
+from botocore.exceptions import ClientError
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
@@ -298,6 +300,7 @@ def process_claim(data):
 
 
 # ================= STATUS UPDATE =================
+
 def reject_claim(body):
 
     claim_id = body.get("Claim_ID")
@@ -305,45 +308,57 @@ def reject_claim(body):
 
     allowed_status = ["Rejected", "Approved"]
 
+    if not claim_id:
+        return {
+            "status": "ERROR",
+            "message": "Claim_ID is required"
+        }
+
     if updated_status not in allowed_status:
         return {
             "status": "ERROR",
             "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
         }
 
-    DB = "claim.xlsx"
+    # ================= FIND RECORDS IN DYNAMODB =================
+    response = table.scan(
+        FilterExpression=Attr("Claim_ID").eq(str(claim_id))
+    )
 
-    if not os.path.exists(DB):
-        return {"status": "ERROR", "message": "Database file not found"}
+    items = response.get("Items", [])
 
-    df = pd.read_excel(DB)
+    if not items:
+        return {
+            "status": "NOT_FOUND",
+            "message": f"No records found for Claim_ID {claim_id}"
+        }
 
-    mask = df["Claim_ID"] == claim_id
+    rows_updated = 0
 
-    if not mask.any():
-        return {"status": "NOT_FOUND", "message": f"No records found for Claim_ID {claim_id}"}
+    # ================= UPDATE STATUS =================
+    for item in items:
 
-    df.loc[mask, "Status"] = updated_status
-    df.to_excel(DB, index=False)
+        try:
+            table.update_item(
+                Key={"HASH": item["HASH"]},
+                UpdateExpression="SET #s = :val, Modified_Time = :m",
+                ExpressionAttributeNames={"#s": "Status"},
+                ExpressionAttributeValues={
+                    ":val": updated_status,
+                    ":m": get_current_timestamp()
+                }
+            )
 
-    for _, row in df[mask].iterrows():
+            rows_updated += 1
 
-        table.update_item(
-            Key={"HASH": str(row["HASH"])},
-            UpdateExpression="SET #s = :val, Modified_Time = :m",
-            ExpressionAttributeNames={"#s": "Status"},
-            ExpressionAttributeValues={
-                ":val": updated_status,
-                ":m": get_current_timestamp()
-            }
-        )
+        except ClientError as e:
+            print(e.response["Error"]["Message"])
 
     return {
         "status": "SUCCESS",
         "message": f"Claim {claim_id} updated to {updated_status}",
-        "rows_updated": int(mask.sum())
+        "rows_updated": rows_updated
     }
-
 
 # ================= FLASK API =================
 app = Flask(__name__)
