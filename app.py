@@ -9,11 +9,7 @@ from decimal import Decimal
 from datetime import datetime, timezone
 
 # ================= DYNAMODB SETUP =================
-dynamodb = boto3.resource(
-    "dynamodb",
-    region_name="ap-south-1"
-)
-
+dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
 table = dynamodb.Table("CLAIM-DATA")
 
 # ================= USER AUTH =================
@@ -35,9 +31,11 @@ def normalize_date(date_str):
     except:
         return None
 
-# ================= get_current_timestamp =================
+
+# ================= CURRENT TIMESTAMP =================
 def get_current_timestamp():
     return datetime.now(timezone.utc).isoformat()
+
 
 # ================= BASE64 DECODER =================
 def decode_base64_file(base64_string):
@@ -68,28 +66,11 @@ def decode_base64_file(base64_string):
 
 
 # ================= DUPLICATE CHECK =================
-# def check_duplicate(df, emp, inv, date, amt):
-
-#     if df.empty:
-#         return False
-
-#     dup = df[
-#         (df["Employee_Code"] == emp) &
-#         (df["Invoice_No"] == inv) &
-#         (df["Date"] == date) &
-#         (abs(df["Total_Amount"] - amt) <= 5)
-#     ]
-
-#     return not dup.empty
-
 def check_duplicate(emp, inv, date, amt):
 
     response = table.scan(
         FilterExpression="Employee_Code = :emp AND Invoice_No = :inv AND #d = :date AND #s = :status",
-        ExpressionAttributeNames={
-            "#d": "Date",
-            "#s": "Status"
-        },
+        ExpressionAttributeNames={"#d": "Date", "#s": "Status"},
         ExpressionAttributeValues={
             ":emp": emp,
             ":inv": inv,
@@ -103,7 +84,6 @@ def check_duplicate(emp, inv, date, amt):
     for item in items:
         existing_amount = float(item.get("Total_Amount", 0))
 
-        # Allow small amount difference tolerance
         if abs(existing_amount - amt) <= 5:
             return True
 
@@ -138,9 +118,11 @@ def insert_into_excel(records):
 def insert_into_dynamodb(records):
 
     with table.batch_writer() as batch:
-        
+
         for rec in records:
+
             current_time = get_current_timestamp()
+
             item = {
                 "HASH": rec["HASH"],
                 "Claim_ID": str(rec["Claim_ID"]),
@@ -149,7 +131,7 @@ def insert_into_dynamodb(records):
                 "Date": str(rec["Date"]),
                 "Claim_Type": str(rec["Claim_Type"]),
                 "Status": str(rec["Status"]),
-                "Remark": str(rec["Remark"]),
+                "Remark": str(rec.get("Remark", "")),
                 "Total_Amount": Decimal(str(rec["Total_Amount"])),
                 "Created_Time": current_time,
                 "Modified_Time": current_time
@@ -181,10 +163,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
         amt = float(row["Total_Amount"])
 
         if check_duplicate(emp, inv, str(date_obj), amt):
-            return {
-                "status": "DUPLICATE_CLAIM",
-                "invoice_number": inv
-            }
+            return {"status": "DUPLICATE_CLAIM", "invoice_number": inv}
 
         total_excel_amount += amt
 
@@ -196,7 +175,8 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
             "Total_Amount": amt,
             "Claim_Type": ctype,
             "Claim_ID": c_id,
-            "Status": "Approved"
+            "Status": "Approved",
+            "Remark": "test"
         })
 
     if total_excel_amount > voucher_amount:
@@ -211,9 +191,14 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
 # ================= CLAIM PROCESSOR =================
 def process_claim(data):
+
     claim = data.get("Claim", {})
     emp = claim.get("Employee_Code")
     c_id = claim.get("Claim_ID")
+
+    if not c_id:
+        return {"status": "ERROR", "message": "Claim_ID missing"}
+
     total_expected = float(claim.get("Total_Bill_Amount", 0))
     vouchers = claim.get("Vouchers", [])
 
@@ -223,16 +208,19 @@ def process_claim(data):
     all_records = []
 
     for v in vouchers:
+
         subtype = v.get("Sub_Type")
         ctype = v.get("Sub_Type")
         voucher_total = 0
         attachments = v.get("Attachments", [])
 
         for att in attachments:
+
             path = decode_base64_file(att.get("base64File"))
 
             try:
-                # DAILY EXPENSE
+
+                # ================= DAILY EXPENSE =================
                 if subtype == "Daily_Expense":
 
                     if not path.endswith(".xlsx"):
@@ -242,12 +230,7 @@ def process_claim(data):
                         }
 
                     result = process_daily_expense_excel(
-                        path,
-                        emp,
-                        ctype,
-                        v,
-                        db_df,
-                        c_id
+                        path, emp, ctype, v, db_df, c_id
                     )
 
                     if "status" in result and result["status"] != "OK":
@@ -256,7 +239,7 @@ def process_claim(data):
                     all_records.extend(result["records"])
                     voucher_total += result["total"]
 
-                # INDIVIDUAL EXPENSE
+                # ================= INDIVIDUAL EXPENSE =================
                 elif subtype == "Individual_Expense":
 
                     if path.endswith(".xlsx"):
@@ -266,6 +249,7 @@ def process_claim(data):
                         }
 
                     text = extract_text_full(path)
+
                     inv = extract_invoice(text)
                     date_text = extract_date_from_text(text)
                     invoice_date = normalize_date(date_text)
@@ -288,7 +272,7 @@ def process_claim(data):
                         "Claim_Type": ctype,
                         "Claim_ID": c_id,
                         "Status": "Approved",
-                        "Remark":"test"
+                        "Remark": "test"
                     })
 
             finally:
@@ -313,16 +297,11 @@ def process_claim(data):
     }
 
 
-# ================= REJECT / APPROVE CLAIM =================
+# ================= STATUS UPDATE =================
 def reject_claim(body):
+
     claim_id = body.get("Claim_ID")
     updated_status = str(body.get("Status", "")).capitalize()
-
-    if not updated_status:
-        return {
-            "status": "ERROR",
-            "message": "Status cannot be empty. Allowed values: Rejected, Approved"
-        }
 
     allowed_status = ["Rejected", "Approved"]
 
@@ -335,37 +314,27 @@ def reject_claim(body):
     DB = "claim.xlsx"
 
     if not os.path.exists(DB):
-        return {
-            "status": "ERROR",
-            "message": "Database file not found"
-        }
+        return {"status": "ERROR", "message": "Database file not found"}
 
     df = pd.read_excel(DB)
 
     mask = df["Claim_ID"] == claim_id
 
     if not mask.any():
-        return {
-            "status": "NOT_FOUND",
-            "message": f"No records found for Claim_ID {claim_id}"
-        }
+        return {"status": "NOT_FOUND", "message": f"No records found for Claim_ID {claim_id}"}
 
-    # Update status in Excel
     df.loc[mask, "Status"] = updated_status
     df.to_excel(DB, index=False)
 
-    # Update status in DynamoDB
     for _, row in df[mask].iterrows():
+
         table.update_item(
-            Key={
-                "HASH": str(row["HASH"])
-            },
-            UpdateExpression="SET #s = :val",
-            ExpressionAttributeNames={
-                "#s": "Status"
-            },
+            Key={"HASH": str(row["HASH"])},
+            UpdateExpression="SET #s = :val, Modified_Time = :m",
+            ExpressionAttributeNames={"#s": "Status"},
             ExpressionAttributeValues={
-                ":val": updated_status
+                ":val": updated_status,
+                ":m": get_current_timestamp()
             }
         )
 
