@@ -241,8 +241,7 @@ def process_claim(data):
 
 
 def reject_claim(body):
-    claim = body.get("Claim", {})
-    claim_id = claim.get("Claim_ID")
+    claim_id = body.get("Claim_ID")
     return claim_id
 
 # ================= FLASK API =================
