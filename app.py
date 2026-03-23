@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 
-# ================= DYNAMODB SETUP =================
+# ================= DYNAMODB SETUP =================+
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
 table = dynamodb.Table("CLAIM-DATA")
 
