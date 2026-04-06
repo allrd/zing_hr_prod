@@ -144,9 +144,7 @@ def insert_into_dynamodb(records):
 
 # ================= DAILY EXPENSE =================
 def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
-
     df = pd.read_excel(path)
-
     required_cols = ["Invoice_No", "Date", "Total_Amount"]
 
     for col in required_cols:
@@ -154,16 +152,15 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
             return {"status": "ERROR", "message": f"{col} column missing in Excel"}
 
     voucher_amount = float(voucher.get("Bill_Amount", 0))
-
     total_excel_amount = 0
     records = []
 
     for _, row in df.iterrows():
-
         inv = str(row["Invoice_No"])
         date_obj = normalize_date(row["Date"])
         amt = float(row["Total_Amount"])
 
+        # Duplicate check only against Approved records in DB
         if check_duplicate(emp, inv, str(date_obj), amt):
             return {"status": "DUPLICATE_CLAIM", "invoice_number": inv}
 
@@ -177,11 +174,18 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
             "Total_Amount": amt,
             "Claim_Type": ctype,
             "Claim_ID": c_id,
-            "Status": "Approved",
+            "Status": "Approved",   # default
             "Remark": "test"
         })
 
+    # If voucher amount mismatched, save all records as Rejected and stop execution
     if total_excel_amount > voucher_amount:
+        for rec in records:
+            rec["Status"] = "Rejected"
+
+        insert_into_excel(records)
+        insert_into_dynamodb(records)
+
         return {
             "status": "VOUCHER_AMOUNT_EXCEEDED",
             "excel_total": total_excel_amount,
@@ -189,7 +193,6 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
         }
 
     return {"records": records, "total": total_excel_amount}
-
 
 # ================= CLAIM PROCESSOR =================
 def process_claim(data):
@@ -225,7 +228,7 @@ def process_claim(data):
                 # ================= DAILY EXPENSE =================
                 if subtype == "Daily_Expense":
 
-                    if not path.endswith(".xlsx"):
+                    if not path.endswith(".xlsx",".csv"):
                         return {
                             "status": "INVALID_ATTACHMENT",
                             "message": "Daily_Expense requires Excel attachment"
@@ -244,7 +247,7 @@ def process_claim(data):
                 # ================= INDIVIDUAL EXPENSE =================
                 elif subtype == "Individual_Expense":
 
-                    if path.endswith(".xlsx"):
+                    if path.endswith(".xlsx",".csv"):
                         return {
                             "status": "INVALID_ATTACHMENT",
                             "message": "Individual_Expense requires PDF or Image"
@@ -284,10 +287,16 @@ def process_claim(data):
         grand_total += voucher_total
 
     if grand_total > total_expected:
-        return {
-            "status": "CLAIM_TOTAL_MISMATCH",
-            "total_attachments_amount": grand_total
-        }
+    for rec in all_records:
+        rec["Status"] = "Rejected"
+
+    insert_into_excel(all_records)
+    insert_into_dynamodb(all_records)
+
+    return {
+        "status": "CLAIM_TOTAL_MISMATCH",
+        "total_attachments_amount": grand_total
+    }
 
     insert_into_excel(all_records)
     insert_into_dynamodb(all_records)
