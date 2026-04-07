@@ -227,6 +227,7 @@ def process_claim(data):
 
                     if not path.endswith(".xlsx"):
                         return {
+                            "code": 1,
                             "status": "INVALID_ATTACHMENT",
                             "message": "Daily_Expense requires Excel attachment"
                         }
@@ -246,6 +247,7 @@ def process_claim(data):
 
                     if path.endswith(".xlsx"):
                         return {
+                            "code":1,
                             "status": "INVALID_ATTACHMENT",
                             "message": "Individual_Expense requires PDF or Image"
                         }
@@ -259,8 +261,10 @@ def process_claim(data):
 
                     if check_duplicate(emp, inv, str(invoice_date), total):
                         return {
+                            "code":1,
                             "status": "DUPLICATE_CLAIM",
-                            "invoice_number": inv
+                            "invoice_number": inv,
+                            "message": f"Duplicate Claim Found, Invoice Numver {inv}"
                         }
 
                     voucher_total += total
@@ -285,17 +289,21 @@ def process_claim(data):
 
     if grand_total > total_expected:
         return {
+            "code":1,
             "status": "CLAIM_TOTAL_MISMATCH",
-            "total_attachments_amount": grand_total
+            "total_attachments_amount": grand_total,
+            "message": f"Claim Total is Mismatch, Total Attachments Amount is {grand_total}"
         }
 
     insert_into_excel(all_records)
     insert_into_dynamodb(all_records)
 
     return {
+        "code":0,
         "status": "NEW_CLAIM",
         "records_saved": len(all_records),
-        "total_amount": grand_total
+        "total_amount": grand_total,
+        "message": f"New claim has been found, Total Amount is {grand_total}, total Record Saved {len(all_records)}"
     }
 
 
@@ -310,12 +318,14 @@ def reject_claim(body):
 
     if not claim_id:
         return {
+            "code":1,
             "status": "ERROR",
             "message": "Claim_ID is required"
         }
 
     if updated_status not in allowed_status:
         return {
+            "code":1,
             "status": "ERROR",
             "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
         }
@@ -329,6 +339,7 @@ def reject_claim(body):
 
     if not items:
         return {
+            "code":1,
             "status": "NOT_FOUND",
             "message": f"No records found for Claim_ID {claim_id}"
         }
@@ -355,6 +366,7 @@ def reject_claim(body):
             print(e.response["Error"]["Message"])
 
     return {
+        "code":0,
         "status": "SUCCESS",
         "message": f"Claim {claim_id} updated to {updated_status}",
         "rows_updated": rows_updated
@@ -371,12 +383,12 @@ def api():
     password = request.headers.get("X-Password")
 
     if username != VALID_USERNAME or password != VALID_PASSWORD:
-        return jsonify({"error": "Invalid username or password"}), 401
+        return jsonify({"code":1,"error": "Invalid username or password"}), 401
 
     try:
         return jsonify(process_claim(request.get_json()))
     except Exception as e:
-        return jsonify({"status": "ERROR1", "message": str(e)})
+        return jsonify({"code":1,"status": "ERROR1", "message": str(e)})
 
 
 @app.route("/status-update", methods=["POST"])
@@ -386,12 +398,12 @@ def reject_api():
     password = request.headers.get("X-Password")
 
     if username != VALID_USERNAME or password != VALID_PASSWORD:
-        return jsonify({"error": "Invalid username or password"}), 401
+        return jsonify({"code":1,"error": "Invalid username or password"}), 401
 
     try:
         return jsonify(reject_claim(request.get_json()))
     except Exception as e:
-        return jsonify({"status": "ERROR1", "message": str(e)})
+        return jsonify({"code":1,"status": "ERROR1", "message": str(e)})
 
 
 if __name__ == "__main__":
