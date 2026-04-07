@@ -143,7 +143,7 @@ def insert_into_dynamodb(records):
 
 
 # ================= DAILY EXPENSE =================
-def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
+def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherNumber):
 
     df = pd.read_excel(path)
 
@@ -198,7 +198,8 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
             "data": {
                 "claim_id": c_id,
                 "excel_total": total_excel_amount,
-                "voucher_amount": voucher_amount
+                "voucher_amount": voucher_amount,
+                "voucher_number":voucherNumber
             },
             "errors": []
         }
@@ -234,6 +235,7 @@ def process_claim(data):
 
         subtype = v.get("Sub_Type")
         ctype = v.get("Sub_Type")
+        voucherNumber = v.get("Vouncher_Number")
         voucher_total = 0
         attachments = v.get("Attachments", [])
 
@@ -259,7 +261,7 @@ def process_claim(data):
                         }
 
                     result = process_daily_expense_excel(
-                        path, emp, ctype, v, db_df, c_id
+                        path, emp, ctype, v, db_df, c_id,voucherNumber
                     )
 
                     if "status" in result and result["status"] != "OK":
@@ -312,7 +314,8 @@ def process_claim(data):
                             "data": {
                                 "claim_id": c_id,
                                 "attachment_Total": voucher_total,
-                                "bill_amount": voucher_amount
+                                "bill_amount": voucher_amount,
+                                "voucher_number":voucherNumber
                             },
                             "errors": []
                         }
