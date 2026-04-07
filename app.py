@@ -192,11 +192,15 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
     if total_excel_amount > voucher_amount:
         return {
-            "code":1,
-            "claim_id":c_id,
+            "code": 1,
             "status": "VOUCHER_AMOUNT_EXCEEDED",
-            "excel_total": total_excel_amount,
-            "voucher_amount": voucher_amount
+            "message": "Excel total exceeds the voucher amount.",
+            "data": {
+                "claim_id": c_id,
+                "excel_total": total_excel_amount,
+                "voucher_amount": voucher_amount
+            },
+            "errors": []
         }
 
     return {"code":1,"claim_id":c_id,"records": records, "total": total_excel_amount}
@@ -210,7 +214,13 @@ def process_claim(data):
     c_id = claim.get("Claim_ID")
 
     if not c_id:
-        return {"status": "ERROR", "message": "Claim_ID missing"}
+        return {
+            "code": 1,
+            "status": "VALIDATION_ERROR",
+            "message": "Claim_ID is required.",
+            "data": {},
+            "errors": ["Missing required field: Claim_ID"]
+        }
 
     total_expected = float(claim.get("Total_Bill_Amount", 0))
     vouchers = claim.get("Vouchers", [])
@@ -238,10 +248,14 @@ def process_claim(data):
 
                     if not path.endswith(".xlsx"):
                         return {
-                            "claim_id":c_id,
                             "code": 1,
                             "status": "INVALID_ATTACHMENT",
-                            "message": "Daily_Expense requires Excel attachment"
+                            "message": "Invalid attachment type provided.",
+                            "data": {
+                                "claim_id": c_id,
+                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense"
+                            },
+                            "errors": []
                         }
 
                     result = process_daily_expense_excel(
@@ -259,10 +273,14 @@ def process_claim(data):
 
                     if path.endswith(".xlsx"):
                         return {
-                            "claim_id":c_id,
-                            "code":1,
+                            "code": 1,
                             "status": "INVALID_ATTACHMENT",
-                            "message": "Individual_Expense requires PDF or Image"
+                            "message": "Invalid attachment type provided.",
+                            "data": {
+                                "claim_id": c_id,
+                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense"
+                            },
+                            "errors": []
                         }
 
                     text = extract_text_full(path)
@@ -306,23 +324,30 @@ def process_claim(data):
 
     if grand_total > total_expected:
         return {
-            "claim_id":c_id,
-            "code":1,
+            "code": 1,
             "status": "CLAIM_TOTAL_MISMATCH",
-            "total_attachments_amount": grand_total,
-            "message": f"Claim Total is Mismatch, Total Attachments Amount is {grand_total}"
+            "message": "The total amount of attachments exceeds the declared claim amount.",
+            "data": {
+                "claim_id": c_id,
+                "attachments_total": grand_total,
+                "expected_total": total_expected
+            },
+            "errors": []
         }
 
     insert_into_excel(all_records)
     insert_into_dynamodb(all_records)
 
     return {
-        "claim_id":c_id,
-        "code":0,
-        "status": "NEW_CLAIM",
-        "records_saved": len(all_records),
-        "total_amount": grand_total,
-        "message": f"New claim has been found, Total Amount is {grand_total}, total Record Saved {len(all_records)}"
+        "code": 0,
+        "status": "SUCCESS",
+        "message": "Claim processed successfully.",
+        "data": {
+            "claim_id": c_id,
+            "records_saved": len(all_records),
+            "total_amount": grand_total
+        },
+        "errors": []
     }
 
 
@@ -337,18 +362,22 @@ def reject_claim(body):
 
     if not claim_id:
         return {
-            "claim_id":claim_id,
-            "code":1,
-            "status": "ERROR",
-            "message": "Claim_ID is required"
+            "code": 1,
+            "status": "VALIDATION_ERROR",
+            "message": "Claim_ID is required.",
+            "data": {},
+            "errors": ["Missing required field: Claim_ID"]
         }
 
     if updated_status not in allowed_status:
         return {
-            "claim_id":claim_id,
-            "code":1,
-            "status": "ERROR",
-            "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
+            "code": 1,
+            "status": "VALIDATION_ERROR",
+            "message": "Claim_ID is required.",
+            "data": {
+                "claim_id": claim_id
+            },
+            "errors": [f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"]
         }
 
     # ================= FIND RECORDS IN DYNAMODB =================
@@ -360,10 +389,13 @@ def reject_claim(body):
 
     if not items:
         return {
-            "claim_id":claim_id,
-            "code":1,
+            "code": 1,
             "status": "NOT_FOUND",
-            "message": f"No records found for Claim_ID {claim_id}"
+            "message": "No records found for the given claim ID.",
+            "data": {
+                "claim_id": claim_id
+            },
+            "errors": []
         }
 
     rows_updated = 0
@@ -388,11 +420,15 @@ def reject_claim(body):
             print(e.response["Error"]["Message"])
 
     return {
-        "claim_id":claim_id,
-        "code":0,
+        "code": 0,
         "status": "SUCCESS",
-        "message": f"Claim {claim_id} updated to {updated_status}",
-        "rows_updated": rows_updated
+        "message": f"Claim '{claim_id}' has been successfully updated to '{updated_status}'.",
+        "data": {
+            "claim_id": claim_id,
+            "rows_updated": rows_updated,
+            "updated_status": updated_status
+        },
+        "errors": []
     }
 
 # ================= FLASK API =================
