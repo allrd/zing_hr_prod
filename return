@@ -166,10 +166,14 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
         if check_duplicate(emp, inv, str(date_obj), amt):
             return {
-                "code":1,
-                "claim_id":c_id,
-                "status": "DUPLICATE_CLAIM", 
-                "invoice_number": inv
+                "code": 1,
+                "status": "DUPLICATE_CLAIM",
+                "message": f"A duplicate claim was detected for invoice '{inv}'.",
+                "data": {
+                    "claim_id": c_id,
+                    "invoice_number": inv
+                },
+                "errors": []
             }
 
         total_excel_amount += amt
