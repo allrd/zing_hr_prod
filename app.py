@@ -151,7 +151,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
     for col in required_cols:
         if col not in df.columns:
-            return {"status": "ERROR", "message": f"{col} column missing in Excel"}
+            return {"code":1,"claim_id":c_id,"status": "ERROR", "message": f"{col} column missing in Excel"}
 
     voucher_amount = float(voucher.get("Bill_Amount", 0))
 
@@ -165,7 +165,12 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
         amt = float(row["Total_Amount"])
 
         if check_duplicate(emp, inv, str(date_obj), amt):
-            return {"status": "DUPLICATE_CLAIM", "invoice_number": inv}
+            return {
+                "code":1,
+                "claim_id":c_id,
+                "status": "DUPLICATE_CLAIM", 
+                "invoice_number": inv
+            }
 
         total_excel_amount += amt
 
@@ -183,12 +188,14 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
 
     if total_excel_amount > voucher_amount:
         return {
+            "code":1,
+            "claim_id":c_id,
             "status": "VOUCHER_AMOUNT_EXCEEDED",
             "excel_total": total_excel_amount,
             "voucher_amount": voucher_amount
         }
 
-    return {"records": records, "total": total_excel_amount}
+    return {"code":1,"claim_id":c_id,"records": records, "total": total_excel_amount}
 
 
 # ================= CLAIM PROCESSOR =================
@@ -227,6 +234,7 @@ def process_claim(data):
 
                     if not path.endswith(".xlsx"):
                         return {
+                            "claim_id":c_id,
                             "code": 1,
                             "status": "INVALID_ATTACHMENT",
                             "message": "Daily_Expense requires Excel attachment"
@@ -247,6 +255,7 @@ def process_claim(data):
 
                     if path.endswith(".xlsx"):
                         return {
+                            "claim_id":c_id,
                             "code":1,
                             "status": "INVALID_ATTACHMENT",
                             "message": "Individual_Expense requires PDF or Image"
@@ -261,6 +270,7 @@ def process_claim(data):
 
                     if check_duplicate(emp, inv, str(invoice_date), total):
                         return {
+                            "claim_id":c_id,
                             "code":1,
                             "status": "DUPLICATE_CLAIM",
                             "invoice_number": inv,
@@ -289,6 +299,7 @@ def process_claim(data):
 
     if grand_total > total_expected:
         return {
+            "claim_id":c_id,
             "code":1,
             "status": "CLAIM_TOTAL_MISMATCH",
             "total_attachments_amount": grand_total,
@@ -299,6 +310,7 @@ def process_claim(data):
     insert_into_dynamodb(all_records)
 
     return {
+        "claim_id":c_id,
         "code":0,
         "status": "NEW_CLAIM",
         "records_saved": len(all_records),
@@ -318,6 +330,7 @@ def reject_claim(body):
 
     if not claim_id:
         return {
+            "claim_id":claim_id,
             "code":1,
             "status": "ERROR",
             "message": "Claim_ID is required"
@@ -325,6 +338,7 @@ def reject_claim(body):
 
     if updated_status not in allowed_status:
         return {
+            "claim_id":claim_id,
             "code":1,
             "status": "ERROR",
             "message": f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"
@@ -339,6 +353,7 @@ def reject_claim(body):
 
     if not items:
         return {
+            "claim_id":claim_id,
             "code":1,
             "status": "NOT_FOUND",
             "message": f"No records found for Claim_ID {claim_id}"
@@ -366,6 +381,7 @@ def reject_claim(body):
             print(e.response["Error"]["Message"])
 
     return {
+        "claim_id":claim_id,
         "code":0,
         "status": "SUCCESS",
         "message": f"Claim {claim_id} updated to {updated_status}",
