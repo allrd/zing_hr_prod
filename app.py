@@ -203,7 +203,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id):
             "errors": []
         }
 
-    return {"code":1,"claim_id":c_id,"records": records, "total": total_excel_amount}
+    return {"code":0,"claim_id":c_id,"records": records, "total": total_excel_amount}
 
 
 # ================= CLAIM PROCESSOR =================
@@ -300,9 +300,23 @@ def process_claim(data):
                                 "invoice_number": inv
                             },
                             "errors": []
-                        }
+                        } 
 
                     voucher_total += total
+                    voucher_amount = float(v.get("Bill_Amount", 0))
+                    if voucher_total > voucher_amount:
+                        return {
+                            "code": 1,
+                            "status": "VOUCHER_AMOUNT_EXCEEDED",
+                            "message": "Total exceeds the voucher amount.",
+                            "data": {
+                                "claim_id": c_id,
+                                "attachment_Total": voucher_total,
+                                "voucher_amount": voucher_amount
+                            },
+                            "errors": []
+                        }
+                        
 
                     all_records.append({
                         "HASH": str(uuid.uuid4()),
