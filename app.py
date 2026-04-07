@@ -255,7 +255,8 @@ def process_claim(data):
                             "message": "Invalid attachment type provided.",
                             "data": {
                                 "claim_id": c_id,
-                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense"
+                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense",
+                                "voucher_number":voucherNumber
                             },
                             "errors": []
                         }
@@ -280,7 +281,8 @@ def process_claim(data):
                             "message": "Invalid attachment type provided.",
                             "data": {
                                 "claim_id": c_id,
-                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense"
+                                "expected": "Excel for Daily Expense / PDF or Image for Individual Expense",
+                                "voucher_number":voucherNumber
                             },
                             "errors": []
                         }
