@@ -312,7 +312,7 @@ def process_claim(data):
                             "data": {
                                 "claim_id": c_id,
                                 "attachment_Total": voucher_total,
-                                "voucher_amount": voucher_amount
+                                "bill_amount": voucher_amount
                             },
                             "errors": []
                         }
