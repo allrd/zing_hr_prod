@@ -274,11 +274,14 @@ def process_claim(data):
 
                     if check_duplicate(emp, inv, str(invoice_date), total):
                         return {
-                            "claim_id":c_id,
-                            "code":1,
+                            "code": 1,
                             "status": "DUPLICATE_CLAIM",
-                            "invoice_number": inv,
-                            "message": f"Duplicate Claim Found, Invoice Numver {inv}"
+                            "message": f"A duplicate claim was detected for invoice '{inv}'.",
+                            "data": {
+                                "claim_id": c_id,
+                                "invoice_number": inv
+                            },
+                            "errors": []
                         }
 
                     voucher_total += total
