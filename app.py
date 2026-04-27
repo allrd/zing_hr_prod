@@ -151,7 +151,12 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherN
 
     for col in required_cols:
         if col not in df.columns:
-            return {"code":1,"claim_id":c_id,"status": "ERROR", "message": f"{col} column missing in Excel"}
+            return {"code":1,
+                    "claim_id":c_id,
+                    "status": "ERROR", 
+                    "message": f"{col} column missing in Excel",
+                    "Path":path
+                   }
 
     voucher_amount = float(voucher.get("Bill_Amount", 0))
 
