@@ -157,7 +157,8 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherN
                 "message": f"{col} column missing in Excel",
                 "data": {
                     "claim_id": c_id,
-                    "voucher_number":voucherNumber
+                    "voucher_number":voucherNumber,
+                    "Details":df
                 }
                 
             }
