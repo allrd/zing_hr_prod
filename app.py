@@ -158,7 +158,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherN
                 "data": {
                     "claim_id": c_id,
                     "voucher_number":voucherNumber,
-                    "Details":df
+                    "Details":df.columns.tolist()
                 }
                 
             }
