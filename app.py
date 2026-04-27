@@ -274,7 +274,12 @@ def process_claim(data):
                             },
                             "errors": []
                         }
-
+                    return {
+                        "code": 1,
+                        "status": "INVALID_ATTACHMENT",
+                        "message": "Invalid attachment type provided.",
+                        "Path" : path
+                    } 
                     # result = process_daily_expense_excel(
                     #     path, emp, ctype, v, db_df, c_id,voucherNumber
                     # )
