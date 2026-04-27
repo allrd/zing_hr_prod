@@ -239,6 +239,20 @@ def process_claim(data):
         voucher_total = 0
         attachments = v.get("Attachments", [])
 
+        # ✅ EARLY VALIDATION FOR SUBTYPE
+        if subtype not in ["Daily_Expense", "Individual_Expense"]:
+            return {
+                "code": 1,
+                "status": "INVALID_SUBTYPE",
+                "message": f"Invalid Sub_Type '{subtype}' provided.",
+                "data": {
+                    "claim_id": c_id,
+                    "voucher_number": voucherNumber,
+                    "allowed_values": ["Daily_Expense", "Individual_Expense"]
+                },
+                "errors": []
+            }
+            
         for att in attachments:
 
             path = decode_base64_file(att.get("base64File"))
