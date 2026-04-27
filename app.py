@@ -275,15 +275,15 @@ def process_claim(data):
                             "errors": []
                         }
 
-                    result = process_daily_expense_excel(
-                        path, emp, ctype, v, db_df, c_id,voucherNumber
-                    )
+                    # result = process_daily_expense_excel(
+                    #     path, emp, ctype, v, db_df, c_id,voucherNumber
+                    # )
 
-                    if "status" in result and result["status"] != "OK":
-                        return result
+                    # if "status" in result and result["status"] != "OK":
+                    #     return result
 
-                    all_records.extend(result["records"])
-                    voucher_total += result["total"]
+                    # all_records.extend(result["records"])
+                    # voucher_total += result["total"]
 
                 # ================= INDIVIDUAL EXPENSE =================
                 elif subtype == "Individual_Expense":
