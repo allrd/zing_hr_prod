@@ -23,8 +23,8 @@ table = dynamodb.Table("CLAIM-DATA")
 # VALID_USERNAME = "UATUser"
 # VALID_PASSWORD = "Admin"
 
-VALID_USERNAME = "UATUser"
-VALID_PASSWORD = "Admin"
+VALID_USERNAME = os.getenv("API_USERNAME")
+VALID_PASSWORD = os.getenv("API_PASSWORD")
 
 
 
@@ -479,10 +479,7 @@ def reject_claim(body):
         "data": {
             "claim_id": claim_id,
             "rows_updated": rows_updated,
-            "updated_status": updated_status,
-            "Load" : load_dotenv(),
-            "Password":os.getenv("API_PASSWORD"),
-            "USERNAME":os.getenv("API_USERNAME")
+            "updated_status": updated_status
         },
         "errors": []
     }
