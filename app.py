@@ -479,7 +479,9 @@ def reject_claim(body):
         "data": {
             "claim_id": claim_id,
             "rows_updated": rows_updated,
-            "updated_status": updated_status
+            "updated_status": updated_status,
+            "USERNAME":os.getenv("API_USERNAME"),
+            "PASSWORD":os.getenv("API_PASSWORD")
         },
         "errors": []
     }
