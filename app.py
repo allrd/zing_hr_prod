@@ -9,14 +9,24 @@ from decimal import Decimal
 from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+print(os.getenv("API_USERNAME"))
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
 table = dynamodb.Table("CLAIM-DATA")
 
 # ================= USER AUTH =================
+# VALID_USERNAME = "UATUser"
+# VALID_PASSWORD = "Admin"
+
 VALID_USERNAME = "UATUser"
 VALID_PASSWORD = "Admin"
+
+
 
 # external extractors
 from total import extract_total, extract_text_full
