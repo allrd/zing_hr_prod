@@ -11,20 +11,16 @@ from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
+#===============Load Env===========================
 load_dotenv()
-
-print(os.getenv("API_USERNAME"))
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
 table = dynamodb.Table("CLAIM-DATA")
 
-# ================= USER AUTH =================
-# VALID_USERNAME = "UATUser"
-# VALID_PASSWORD = "Admin"
-
+# ================= USER AUTH =====================
 VALID_USERNAME = os.getenv("API_USERNAME")
-VALID_PASSWORD = os.getenv("API_PASSWORD")
+VALID_PWD = os.getenv("API_PWD")
 
 
 
@@ -479,9 +475,7 @@ def reject_claim(body):
         "data": {
             "claim_id": claim_id,
             "rows_updated": rows_updated,
-            "updated_status": updated_status,
-            "USERNAME":os.getenv("API_USERNAME"),
-            "PASSWORD":os.getenv("API_PASSWORD")
+            "updated_status": updated_status
         },
         "errors": []
     }
@@ -494,9 +488,9 @@ app = Flask(__name__)
 def api():
 
     username = request.headers.get("X-Username")
-    password = request.headers.get("X-Password")
+    pwd = request.headers.get("X-Password")
 
-    if username != VALID_USERNAME or password != VALID_PASSWORD:
+    if username != VALID_USERNAME or pwd != VALID_PWD:
         return jsonify({"code":1,"error": "Invalid username or password"}), 401
 
     try:
@@ -509,9 +503,9 @@ def api():
 def reject_api():
 
     username = request.headers.get("X-Username")
-    password = request.headers.get("X-Password")
+    pwd = request.headers.get("X-Password")
 
-    if username != VALID_USERNAME or password != VALID_PASSWORD:
+    if username != VALID_USERNAME or pwd != VALID_PWD:
         return jsonify({"code":1,"error": "Invalid username or password"}), 401
 
     try:
