@@ -11,9 +11,9 @@ from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
-print(os.getenv("API_USERNAME"))
+# print(os.getenv("API_USERNAME"))
 
 # ================= DYNAMODB SETUP =================
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
