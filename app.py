@@ -480,7 +480,9 @@ def reject_claim(body):
             "claim_id": claim_id,
             "rows_updated": rows_updated,
             "updated_status": updated_status,
-            "check" : load_dotenv()
+            "Load" : load_dotenv().
+            "Password":os.getenv("API_PASSWORD"),
+            "USERNAME":os.getenv("API_USERNAME")
         },
         "errors": []
     }
