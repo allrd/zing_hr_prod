@@ -433,52 +433,52 @@ def reject_claim(body):
     response = table.scan(
         FilterExpression=Attr("Claim_ID").eq(str(claim_id))
     )
+    return {"Data":response}
+    # items = response.get("Items", [])
 
-    items = response.get("Items", [])
+    # if not items:
+    #     return {
+    #         "code": 1,
+    #         "status": "NOT_FOUND",
+    #         "message": "No records found for the given claim ID.",
+    #         "data": {
+    #             "claim_id": claim_id
+    #         },
+    #         "errors": []
+    #     }
 
-    if not items:
-        return {
-            "code": 1,
-            "status": "NOT_FOUND",
-            "message": "No records found for the given claim ID.",
-            "data": {
-                "claim_id": claim_id
-            },
-            "errors": []
-        }
+    # rows_updated = 0
 
-    rows_updated = 0
+    # # ================= UPDATE STATUS =================
+    # for item in items:
 
-    # ================= UPDATE STATUS =================
-    for item in items:
+    #     try:
+    #         table.update_item(
+    #             Key={"HASH": item["HASH"]},
+    #             UpdateExpression="SET #s = :val, Modified_Time = :m",
+    #             ExpressionAttributeNames={"#s": "Status"},
+    #             ExpressionAttributeValues={
+    #                 ":val": updated_status,
+    #                 ":m": get_current_timestamp()
+    #             }
+    #         )
 
-        try:
-            table.update_item(
-                Key={"HASH": item["HASH"]},
-                UpdateExpression="SET #s = :val, Modified_Time = :m",
-                ExpressionAttributeNames={"#s": "Status"},
-                ExpressionAttributeValues={
-                    ":val": updated_status,
-                    ":m": get_current_timestamp()
-                }
-            )
+    #         rows_updated += 1
 
-            rows_updated += 1
+    #     except ClientError as e:
+    #         print(e.response["Error"]["Message"])
 
-        except ClientError as e:
-            print(e.response["Error"]["Message"])
-
-    return {
-        "code": 0,
-        "status": "SUCCESS",
-        "message": f"Claim '{claim_id}' has been successfully updated to '{updated_status}'.",
-        "data": {
-            "claim_id": claim_id,
-            "rows_updated": rows_updated,
-            "updated_status": updated_status
-        },
-        "errors": []
-    }
+    # return {
+    #     "code": 0,
+    #     "status": "SUCCESS",
+    #     "message": f"Claim '{claim_id}' has been successfully updated to '{updated_status}'.",
+    #     "data": {
+    #         "claim_id": claim_id,
+    #         "rows_updated": rows_updated,
+    #         "updated_status": updated_status
+    #     },
+    #     "errors": []
+    # }
 
 # ================= FLASK API =================
 app = Flask(__name__)
