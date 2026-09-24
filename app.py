@@ -486,19 +486,16 @@ app = Flask(__name__)
 
 @app.route("/process-invoice", methods=["POST"])
 def api():
-    return {"Status":"Success"}
+    username = request.headers.get("X-Username")
+    pwd = request.headers.get("X-Password")
 
+    if username != VALID_USERNAME or pwd != VALID_PWD:
+        return jsonify({"code":1,"error": "Invalid username or password"}), 401
 
-#    username = request.headers.get("X-Username")
- #   pwd = request.headers.get("X-Password")
-
-  #  if username != VALID_USERNAME or pwd != VALID_PWD:
-   #     return jsonify({"code":1,"error": "Invalid username or password"}), 401
-
-    #try:
-     #   return jsonify(process_claim(request.get_json()))
-   # except Exception as e:
-    #    return jsonify({"code":1,"status": "ERROR1", "message": str(e)})
+    try:
+        return jsonify(process_claim(request.get_json()))
+    except Exception as e:
+        return jsonify({"code":1,"status": "ERROR1", "message": str(e)})
 
 
 @app.route("/status-update", methods=["POST"])
