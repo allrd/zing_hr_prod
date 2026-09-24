@@ -433,7 +433,6 @@ def reject_claim(body):
     response = table.scan(
         FilterExpression=Attr("Claim_ID").eq(str(claim_id))
     )
-    return {"Data":"Work"}
     items = response.get("Items", [])
 
     if not items:
