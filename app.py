@@ -160,7 +160,6 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherN
             return {
                 "code": 1,
                 "status": "COLUMN_MISSING",
-                "miss_value": path,
                 "message": f"{col} column missing in Excel",
                 "data": {
                     "claim_id": c_id,
