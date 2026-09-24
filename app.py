@@ -430,10 +430,10 @@ def reject_claim(body):
         }
 
     # ================= FIND RECORDS IN DYNAMODB =================
-    response = table.scan(
-        FilterExpression=Attr("Claim_ID").eq(str(claim_id))
-    )
-    return {"Data":response}
+    # response = table.scan(
+    #     FilterExpression=Attr("Claim_ID").eq(str(claim_id))
+    # )
+    return {"Data":"Work"}
     # items = response.get("Items", [])
 
     # if not items:
