@@ -429,10 +429,10 @@ def reject_claim(body):
             "errors": [f"Invalid Status '{updated_status}'. Allowed values: {allowed_status}"]
         }
 
-    # ================= FIND RECORDS IN DYNAMODB =================
-    # response = table.scan(
-    #     FilterExpression=Attr("Claim_ID").eq(str(claim_id))
-    # )
+    ================= FIND RECORDS IN DYNAMODB =================
+    response = table.scan(
+        FilterExpression=Attr("Claim_ID").eq(str(claim_id))
+    )
     return {"Data":"Work"}
     # items = response.get("Items", [])
 
