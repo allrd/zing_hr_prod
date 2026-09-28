@@ -883,12 +883,17 @@ def api():
 
     authenticated_entity = authenticate_request()
 
+    username = request.headers.get("X-Username")
+    password = request.headers.get("X-Password")
+
     if not authenticated_entity:
 
         return jsonify({
             "code": 1,
             "error": "Invalid username or password",
-            "response":authenticated_entity
+            "response":authenticated_entity,
+            "UserName": username,
+            "PWD":password
         }), 401
 
     try:
