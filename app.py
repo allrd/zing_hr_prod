@@ -893,8 +893,7 @@ def api():
             "error": "Invalid username or password",
             "response":authenticated_entity,
             "UserName": username,
-            "PWD":password,
-            "Details:ENTITY_CREDENTIALS.items()
+            "PWD":password
         }), 401
 
     try:
