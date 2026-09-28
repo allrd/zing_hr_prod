@@ -89,7 +89,8 @@ def authenticate_request():
     for entity, credentials in ENTITY_CREDENTIALS.items():
 
         print("Checking entity:", entity, flush=True)
-
+        print("UserName Crediatal : ",credentials["username"],flush=True)
+        print("UserName Passwrd cred : ",credentials["password"],flush=True)
         username_match = secrets.compare_digest(
             username,
             credentials["username"]
