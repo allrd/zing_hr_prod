@@ -74,23 +74,46 @@ ENTITY_CREDENTIALS = {
 
 def authenticate_request():
 
-    print("========== AUTH FUNCTION CALLED ==========")
+    print("AUTH 1: Function called", flush=True)
 
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
-    print("Username received:", repr(username),flush=True)
-    print("Password received:", bool(password),flush=True)
+    print("AUTH 2: Username:", repr(username), flush=True)
+    print("AUTH 3: Password received:", bool(password), flush=True)
 
     if not username or not password:
-        print("AUTH FAILED: Username or password missing")
+        print("AUTH 4: Missing username/password", flush=True)
         return None
+
+    print("AUTH 5: Before loop", flush=True)
+
+    print(
+        "AUTH 6: Entities:",
+        list(ENTITY_CREDENTIALS.keys()),
+        flush=True
+    )
 
     for entity, credentials in ENTITY_CREDENTIALS.items():
 
-        print("Checking entity:", entity, flush=True)
-        print("UserName Crediatal : ",credentials["username"],flush=True)
-        print("UserName Passwrd cred : ",credentials["password"],flush=True)
+        print(
+            "AUTH 7: Entity:",
+            entity,
+            flush=True
+        )
+
+        print(
+            "AUTH 8: Username configured:",
+            repr(credentials.get("username")),
+            flush=True
+        )
+
+        print(
+            "AUTH 9: Password configured:",
+            bool(credentials.get("password")),
+            flush=True
+        )
+
         username_match = secrets.compare_digest(
             username,
             credentials["username"]
@@ -101,16 +124,29 @@ def authenticate_request():
             credentials["password"]
         )
 
-        print("Username match:", username_match, flush=True)
-        print("Password match:", password_match, flush=True)
+        print(
+            "AUTH 10: Username match:",
+            username_match,
+            flush=True
+        )
+
+        print(
+            "AUTH 11: Password match:",
+            password_match,
+            flush=True
+        )
 
         if username_match and password_match:
 
-            print("AUTH SUCCESS:", entity, flush=True)
+            print(
+                "AUTH 12: SUCCESS:",
+                entity,
+                flush=True
+            )
 
             return entity
 
-    print("AUTH FAILED: No matching credentials", flush=True)
+    print("AUTH 13: No matching credentials", flush=True)
 
     return None
 
