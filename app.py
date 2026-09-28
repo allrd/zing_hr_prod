@@ -101,6 +101,7 @@ def authenticate_request():
             entity,
             flush=True
         )
+        print("Working",flush=True)
 
         print(
             "AUTH 8: Username configured:",
