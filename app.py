@@ -64,24 +64,31 @@ def authenticate_request():
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
-    if not username or not password:
-        return None
+    print("========== AUTH DEBUG ==========")
+    print("Received username:", repr(username))
+    print("Password received:", bool(password))
+    print("Password length:", len(password) if password else 0)
 
     for entity, credentials in ENTITY_CREDENTIALS.items():
 
-        username_match = secrets.compare_digest(
-            username,
-            credentials["username"]
+        print("Checking entity:", entity)
+        print(
+            "Username match:",
+            username == credentials["username"]
+        )
+        print(
+            "Password match:",
+            password == credentials["password"]
         )
 
-        password_match = secrets.compare_digest(
-            password,
-            credentials["password"]
-        )
-
-        if username_match and password_match:
+        if (
+            username == credentials["username"]
+            and password == credentials["password"]
+        ):
+            print("AUTH SUCCESS:", entity)
             return entity
 
+    print("AUTH FAILED")
     return None
 
 
