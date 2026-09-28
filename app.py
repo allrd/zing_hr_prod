@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 from dateutil import parser
 import boto3
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezoneauth
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientErrorƒauth
 from dotenv import load_dotenv
@@ -890,10 +890,7 @@ def api():
 
         return jsonify({
             "code": 1,
-            "error": "Invalid username or password",
-            "response":authenticated_entity,
-            "UserName": username,
-            "PWD":password
+            "error": "Invalid username or password"
         }), 401
 
     try:
