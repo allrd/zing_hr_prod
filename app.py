@@ -107,7 +107,7 @@ def insert_into_excel(records):
         df = pd.read_excel(DB)
     else:
         df = pd.DataFrame(columns=[
-            "HASH",
+            "hash",
             "Employee_Code",
             "Invoice_No",
             "Date",
@@ -132,7 +132,7 @@ def insert_into_dynamodb(records):
             current_time = get_current_timestamp()
 
             item = {
-                "HASH": rec["HASH"],
+                "hash": rec["hash"],
                 "Claim_ID": str(rec["Claim_ID"]),
                 "Invoice_No": str(rec["Invoice_No"]),
                 "Employee_Code": str(rec["Employee_Code"]),
@@ -195,7 +195,7 @@ def process_daily_expense_excel(path, emp, ctype, voucher, db_df, c_id, voucherN
         total_excel_amount += amt
 
         records.append({
-            "HASH": str(uuid.uuid4()),
+            "hash": str(uuid.uuid4()),
             "Employee_Code": emp,
             "Invoice_No": inv,
             "Date": str(date_obj),
@@ -354,7 +354,7 @@ def process_claim(data):
                         
 
                     all_records.append({
-                        "HASH": str(uuid.uuid4()),
+                        "hash": str(uuid.uuid4()),
                         "Employee_Code": emp,
                         "Invoice_No": inv,
                         "Date": str(invoice_date),
@@ -453,7 +453,7 @@ def reject_claim(body):
 
         try:
             table.update_item(
-                Key={"HASH": item["HASH"]},
+                Key={"hash": item["hash"]},
                 UpdateExpression="SET #s = :val, Modified_Time = :m",
                 ExpressionAttributeNames={"#s": "Status"},
                 ExpressionAttributeValues={
