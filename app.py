@@ -1017,7 +1017,7 @@ app = Flask(
     methods=["POST"]
 )
 def api():
-
+    print("Working Finr API")
     authenticated_entity = authenticate_request()
 
     if not authenticated_entity:
