@@ -8,7 +8,7 @@ import boto3
 from decimal import Decimal
 from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Attr
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientErrorƒauth
 from dotenv import load_dotenv
 import secrets
 
@@ -893,7 +893,8 @@ def api():
             "error": "Invalid username or password",
             "response":authenticated_entity,
             "UserName": username,
-            "PWD":password
+            "PWD":password,
+            "Details:ENTITY_CREDENTIALS.items()
         }), 401
 
     try:
