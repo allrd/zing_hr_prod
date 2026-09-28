@@ -19,6 +19,11 @@ load_dotenv(
     os.path.join(BASE_DIR, ".env")
 )
 
+print("JPSL username loaded:", bool(os.getenv("JPSL_API_USERNAME")))
+print("JPSL password loaded:", bool(os.getenv("JPSL_API_PWD")))
+print("JPB username loaded:", bool(os.getenv("JPB_API_USERNAME")))
+print("JPB password loaded:", bool(os.getenv("JPB_API_PWD")))
+
 # ================= DYNAMODB SETUP ===================
 dynamodb = boto3.resource(
     "dynamodb",
