@@ -12,8 +12,12 @@ from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 import secrets
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # =============== LOAD ENV ===========================
-load_dotenv()
+load_dotenv(
+    os.path.join(BASE_DIR, ".env")
+)
 
 # ================= DYNAMODB SETUP ===================
 dynamodb = boto3.resource(
