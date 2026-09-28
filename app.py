@@ -1110,20 +1110,3 @@ if __name__ == "__main__":
         port=5001,
         debug=False
     )
-```
-
-### `.env`
-
-Keep your `.env` as:
-
-```env
-JPSL_API_USERNAME=jpsl_api
-JPSL_API_PWD="JPSL@2026#Strong"
-
-JPB_API_USERNAME=jpb_api
-JPB_API_PWD="JPB@2026#Strong"
-```
-
-If JFS is not currently required, you don't need to add it. The code automatically ignores an entity whose credentials are not configured.
-
-### After replacing `app
