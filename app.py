@@ -19,11 +19,6 @@ load_dotenv(
     os.path.join(BASE_DIR, ".env")
 )
 
-print("JPSL USER:", os.getenv("JPSL_API_USERNAME"))
-print("JPSL PASSWORD LOADED:", bool(os.getenv("JPSL_API_PWD")))
-
-print("JPB USER:", os.getenv("JPB_API_USERNAME"))
-print("JPB PASSWORD LOADED:", bool(os.getenv("JPB_API_PWD")))
 
 # ================= DYNAMODB SETUP ===================
 dynamodb = boto3.resource(
@@ -892,7 +887,8 @@ def api():
 
         return jsonify({
             "code": 1,
-            "error": "Invalid username or password"
+            "error": "Invalid username or password",
+            "response":authenticated_entity
         }), 401
 
     try:
