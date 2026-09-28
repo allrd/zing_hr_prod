@@ -2,86 +2,46 @@ import os
 import base64
 import uuid
 import pandas as pd
-
 from flask import Flask, request, jsonify
 from dateutil import parser
-
 import boto3
-
 from decimal import Decimal
 from datetime import datetime, timezone
-
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
-
 from dotenv import load_dotenv
-
 import secrets
 
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-
+# =============== LOAD ENV ===========================
 load_dotenv()
 
-
-# ============================================================
-# DYNAMODB SETUP
-# ============================================================
-
+# ================= DYNAMODB SETUP ===================
 dynamodb = boto3.resource(
     "dynamodb",
     region_name="ap-south-1"
 )
 
-table = dynamodb.Table(
-    "CLAIM-DATA"
-)
+table = dynamodb.Table("CLAIM-DATA")
 
 
-# ============================================================
-# ENTITY CREDENTIAL CONFIGURATION
-# ============================================================
-#
-# Credentials are maintained in .env
-#
-# Example:
-#
-# JPSL_API_USERNAME=jpsl_user
-# JPSL_API_PWD=xxxxxxxx
-#
-# JPB_API_USERNAME=jpb_user
-# JPB_API_PWD=xxxxxxxx
-#
-# JFS_API_USERNAME=jfs_user
-# JFS_API_PWD=xxxxxxxx
-#
-# ============================================================
+# ================= USER AUTH ========================
 
 ENTITY_CREDENTIALS = {
-
     "JPSL": {
         "username": os.getenv("JPSL_API_USERNAME"),
         "password": os.getenv("JPSL_API_PWD")
     },
-
     "JPB": {
         "username": os.getenv("JPB_API_USERNAME"),
         "password": os.getenv("JPB_API_PWD")
     },
-
     "JFS": {
         "username": os.getenv("JFS_API_USERNAME"),
         "password": os.getenv("JFS_API_PWD")
     }
 }
 
-
-# ============================================================
-# REMOVE ENTITIES WHERE CREDENTIALS ARE NOT CONFIGURED
-# ============================================================
-
+# Remove entities where credentials are not configured
 ENTITY_CREDENTIALS = {
     entity: credentials
     for entity, credentials in ENTITY_CREDENTIALS.items()
@@ -89,70 +49,40 @@ ENTITY_CREDENTIALS = {
 }
 
 
-# ============================================================
-# AUTHENTICATION FUNCTION
-# ============================================================
-
 def authenticate_request():
 
-    username = request.headers.get(
-        "X-Username"
-    )
-
-    password = request.headers.get(
-        "X-Password"
-    )
-
-    # --------------------------------------------------------
-    # Check whether credentials were supplied
-    # --------------------------------------------------------
+    username = request.headers.get("X-Username")
+    password = request.headers.get("X-Password")
 
     if not username or not password:
-
         return None
-
-    # --------------------------------------------------------
-    # Compare credentials against each configured entity
-    # --------------------------------------------------------
 
     for entity, credentials in ENTITY_CREDENTIALS.items():
 
-        configured_username = credentials["username"]
-        configured_password = credentials["password"]
-
         username_match = secrets.compare_digest(
             username,
-            configured_username
+            credentials["username"]
         )
 
         password_match = secrets.compare_digest(
             password,
-            configured_password
+            credentials["password"]
         )
 
         if username_match and password_match:
-
             return entity
-
-    # --------------------------------------------------------
-    # Invalid credentials
-    # --------------------------------------------------------
 
     return None
 
 
-# ============================================================
-# EXTERNAL EXTRACTORS
-# ============================================================
+# ================= EXTERNAL EXTRACTORS =============
 
 from total import extract_total, extract_text_full
 from invoice import extract_invoice
 from date import extract_date_from_text
 
 
-# ============================================================
-# DATE NORMALIZER
-# ============================================================
+# ================= DATE NORMALIZER ==================
 
 def normalize_date(date_str):
 
@@ -160,45 +90,31 @@ def normalize_date(date_str):
         return None
 
     try:
-
         return parser.parse(
             str(date_str),
             dayfirst=True
         ).date()
 
     except Exception:
-
         return None
 
 
-# ============================================================
-# CURRENT TIMESTAMP
-# ============================================================
+# ================= CURRENT TIMESTAMP ================
 
 def get_current_timestamp():
 
-    return datetime.now(
-        timezone.utc
-    ).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
-# ============================================================
-# BASE64 DECODER
-# ============================================================
+# ================= BASE64 DECODER ===================
 
 def decode_base64_file(base64_string):
 
     if not base64_string:
-
-        raise ValueError(
-            "Attachment base64 missing"
-        )
+        raise ValueError("Attachment base64 missing")
 
     if "base64," in base64_string:
-
-        base64_string = base64_string.split(
-            "base64,"
-        )[1]
+        base64_string = base64_string.split("base64,")[1]
 
     file_bytes = base64.b64decode(
         base64_string.strip()
@@ -210,15 +126,12 @@ def decode_base64_file(base64_string):
     )
 
     if file_bytes.startswith(b"%PDF"):
-
         ext = ".pdf"
 
     elif file_bytes[:2] == b"PK":
-
         ext = ".xlsx"
 
     else:
-
         ext = ".jpg"
 
     path = os.path.join(
@@ -226,40 +139,27 @@ def decode_base64_file(base64_string):
         f"{uuid.uuid4()}{ext}"
     )
 
-    with open(
-        path,
-        "wb"
-    ) as f:
-
+    with open(path, "wb") as f:
         f.write(file_bytes)
 
     return path
 
 
-# ============================================================
-# DUPLICATE CHECK
-# ============================================================
+# ================= DUPLICATE CHECK ==================
 
-def check_duplicate(
-    emp,
-    inv,
-    date,
-    amt
-):
+def check_duplicate(emp, inv, date, amt):
 
     response = table.scan(
-
-        FilterExpression=
+        FilterExpression=(
             "Employee_Code = :emp "
             "AND Invoice_No = :inv "
             "AND #d = :date "
-            "AND #s = :status",
-
+            "AND #s = :status"
+        ),
         ExpressionAttributeNames={
             "#d": "Date",
             "#s": "Status"
         },
-
         ExpressionAttributeValues={
             ":emp": emp,
             ":inv": inv,
@@ -282,18 +182,13 @@ def check_duplicate(
             )
         )
 
-        if abs(
-            existing_amount - amt
-        ) <= 5:
-
+        if abs(existing_amount - amt) <= 5:
             return True
 
     return False
 
 
-# ============================================================
-# SAVE TO EXCEL
-# ============================================================
+# ================= SAVE TO EXCEL ====================
 
 def insert_into_excel(records):
 
@@ -301,9 +196,7 @@ def insert_into_excel(records):
 
     if os.path.exists(DB):
 
-        df = pd.read_excel(
-            DB
-        )
+        df = pd.read_excel(DB)
 
     else:
 
@@ -335,9 +228,7 @@ def insert_into_excel(records):
     )
 
 
-# ============================================================
-# SAVE TO DYNAMODB
-# ============================================================
+# ================= SAVE TO DYNAMODB ==================
 
 def insert_into_dynamodb(records):
 
@@ -349,6 +240,8 @@ def insert_into_dynamodb(records):
 
             item = {
 
+                # IMPORTANT:
+                # DynamoDB partition key is lowercase "hash"
                 "hash": rec["hash"],
 
                 "Claim_ID": str(
@@ -383,9 +276,7 @@ def insert_into_dynamodb(records):
                 ),
 
                 "Total_Amount": Decimal(
-                    str(
-                        rec["Total_Amount"]
-                    )
+                    str(rec["Total_Amount"])
                 ),
 
                 "Created_Time": current_time,
@@ -398,9 +289,7 @@ def insert_into_dynamodb(records):
             )
 
 
-# ============================================================
-# DAILY EXPENSE
-# ============================================================
+# ================= DAILY EXPENSE ====================
 
 def process_daily_expense_excel(
     path,
@@ -412,9 +301,7 @@ def process_daily_expense_excel(
     voucherNumber
 ):
 
-    df = pd.read_excel(
-        path
-    )
+    df = pd.read_excel(path)
 
     required_cols = [
         "Invoice_No",
@@ -428,23 +315,13 @@ def process_daily_expense_excel(
 
             return {
                 "code": 1,
-
                 "status": "COLUMN_MISSING",
-
-                "message":
-                    f"{col} column missing in Excel",
-
+                "message": f"{col} column missing in Excel",
                 "data": {
-
                     "claim_id": c_id,
-
-                    "voucher_number":
-                        voucherNumber,
-
-                    "columns_in_file":
-                        df.columns.tolist()
+                    "voucher_number": voucherNumber,
+                    "columns_in_file": df.columns.tolist()
                 },
-
                 "errors": []
             }
 
@@ -481,23 +358,16 @@ def process_daily_expense_excel(
         ):
 
             return {
-
                 "code": 1,
-
-                "status":
-                    "DUPLICATE_CLAIM",
-
-                "message":
+                "status": "DUPLICATE_CLAIM",
+                "message": (
                     f"A duplicate claim was detected "
-                    f"for invoice '{inv}'.",
-
+                    f"for invoice '{inv}'."
+                ),
                 "data": {
-
                     "claim_id": c_id,
-
                     "invoice_number": inv
                 },
-
                 "errors": []
             }
 
@@ -505,17 +375,15 @@ def process_daily_expense_excel(
 
         records.append({
 
-            "hash": str(
-                uuid.uuid4()
-            ),
+            # IMPORTANT:
+            # DynamoDB key is lowercase "hash"
+            "hash": str(uuid.uuid4()),
 
             "Employee_Code": emp,
 
             "Invoice_No": inv,
 
-            "Date": str(
-                date_obj
-            ),
+            "Date": str(date_obj),
 
             "Total_Amount": amt,
 
@@ -531,48 +399,27 @@ def process_daily_expense_excel(
     if total_excel_amount > voucher_amount:
 
         return {
-
             "code": 1,
-
-            "status":
-                "VOUCHER_AMOUNT_EXCEEDED",
-
-            "message":
-                "Excel total exceeds the voucher amount.",
-
+            "status": "VOUCHER_AMOUNT_EXCEEDED",
+            "message": "Excel total exceeds the voucher amount.",
             "data": {
-
                 "claim_id": c_id,
-
-                "excel_total":
-                    total_excel_amount,
-
-                "voucher_amount":
-                    voucher_amount,
-
-                "voucher_number":
-                    voucherNumber
+                "excel_total": total_excel_amount,
+                "voucher_amount": voucher_amount,
+                "voucher_number": voucherNumber
             },
-
             "errors": []
         }
 
     return {
-
         "code": 0,
-
         "claim_id": c_id,
-
         "records": records,
-
-        "total":
-            total_excel_amount
+        "total": total_excel_amount
     }
 
 
-# ============================================================
-# CLAIM PROCESSOR
-# ============================================================
+# ================= CLAIM PROCESSOR ==================
 
 def process_claim(data):
 
@@ -592,17 +439,10 @@ def process_claim(data):
     if not c_id:
 
         return {
-
             "code": 1,
-
-            "status":
-                "VALIDATION_ERROR",
-
-            "message":
-                "Claim_ID is required.",
-
+            "status": "VALIDATION_ERROR",
+            "message": "Claim_ID is required.",
             "data": {},
-
             "errors": [
                 "Missing required field: Claim_ID"
             ]
@@ -651,9 +491,7 @@ def process_claim(data):
             []
         )
 
-        # ====================================================
-        # SUBTYPE VALIDATION
-        # ====================================================
+        # =============== SUBTYPE VALIDATION ==========
 
         if subtype not in [
             "Daily_Expense",
@@ -661,90 +499,58 @@ def process_claim(data):
         ]:
 
             return {
-
                 "code": 1,
-
-                "status":
-                    "INVALID_SUBTYPE",
-
-                "message":
-                    f"Invalid Sub_Type '{subtype}' provided.",
-
+                "status": "INVALID_SUBTYPE",
+                "message": (
+                    f"Invalid Sub_Type '{subtype}' provided."
+                ),
                 "data": {
-
                     "claim_id": c_id,
-
-                    "voucher_number":
-                        voucherNumber,
-
+                    "voucher_number": voucherNumber,
                     "allowed_values": [
                         "Daily_Expense",
                         "Individual_Expense"
                     ]
                 },
-
                 "errors": []
             }
 
         for att in attachments:
 
             path = decode_base64_file(
-                att.get(
-                    "base64File"
-                )
+                att.get("base64File")
             )
 
             try:
 
-                # =================================================
-                # DAILY EXPENSE
-                # =================================================
+                # ============ DAILY EXPENSE ============
 
                 if subtype == "Daily_Expense":
 
-                    if not path.endswith(
-                        ".xlsx"
-                    ):
+                    if not path.endswith(".xlsx"):
 
                         return {
-
                             "code": 1,
-
-                            "status":
-                                "INVALID_ATTACHMENT",
-
-                            "message":
-                                "Invalid attachment type provided.",
-
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Invalid attachment type provided.",
                             "data": {
-
                                 "claim_id": c_id,
-
-                                "expected":
+                                "expected": (
                                     "Excel for Daily Expense / "
-                                    "PDF or Image for Individual Expense",
-
-                                "voucher_number":
-                                    voucherNumber
+                                    "PDF or Image for Individual Expense"
+                                ),
+                                "voucher_number": voucherNumber
                             },
-
                             "errors": []
                         }
 
                     result = process_daily_expense_excel(
-
                         path,
-
                         emp,
-
                         ctype,
-
                         v,
-
                         db_df,
-
                         c_id,
-
                         voucherNumber
                     )
 
@@ -752,49 +558,33 @@ def process_claim(data):
                         "status" in result
                         and result["status"] != "OK"
                     ):
-
                         return result
 
                     all_records.extend(
                         result["records"]
                     )
 
-                    voucher_total += result[
-                        "total"
-                    ]
+                    voucher_total += result["total"]
 
-                # =================================================
-                # INDIVIDUAL EXPENSE
-                # =================================================
+
+                # ============ INDIVIDUAL EXPENSE ======
 
                 elif subtype == "Individual_Expense":
 
-                    if path.endswith(
-                        ".xlsx"
-                    ):
+                    if path.endswith(".xlsx"):
 
                         return {
-
                             "code": 1,
-
-                            "status":
-                                "INVALID_ATTACHMENT",
-
-                            "message":
-                                "Invalid attachment type provided.",
-
+                            "status": "INVALID_ATTACHMENT",
+                            "message": "Invalid attachment type provided.",
                             "data": {
-
                                 "claim_id": c_id,
-
-                                "expected":
+                                "expected": (
                                     "Excel for Daily Expense / "
-                                    "PDF or Image for Individual Expense",
-
-                                "voucher_number":
-                                    voucherNumber
+                                    "PDF or Image for Individual Expense"
+                                ),
+                                "voucher_number": voucherNumber
                             },
-
                             "errors": []
                         }
 
@@ -815,9 +605,7 @@ def process_claim(data):
                     )
 
                     total = float(
-                        extract_total(
-                            text
-                        ) or 0
+                        extract_total(text) or 0
                     )
 
                     if check_duplicate(
@@ -828,24 +616,16 @@ def process_claim(data):
                     ):
 
                         return {
-
                             "code": 1,
-
-                            "status":
-                                "DUPLICATE_CLAIM",
-
-                            "message":
+                            "status": "DUPLICATE_CLAIM",
+                            "message": (
                                 f"A duplicate claim was detected "
-                                f"for invoice '{inv}'.",
-
+                                f"for invoice '{inv}'."
+                            ),
                             "data": {
-
                                 "claim_id": c_id,
-
-                                "invoice_number":
-                                    inv
+                                "invoice_number": inv
                             },
-
                             "errors": []
                         }
 
@@ -861,45 +641,29 @@ def process_claim(data):
                     if voucher_total > voucher_amount:
 
                         return {
-
                             "code": 1,
-
-                            "status":
-                                "VOUCHER_AMOUNT_EXCEEDED",
-
-                            "message":
-                                "Total exceeds the voucher amount.",
-
+                            "status": "VOUCHER_AMOUNT_EXCEEDED",
+                            "message": "Total exceeds the voucher amount.",
                             "data": {
-
                                 "claim_id": c_id,
-
-                                "attachment_Total":
-                                    voucher_total,
-
-                                "bill_amount":
-                                    voucher_amount,
-
-                                "voucher_number":
-                                    voucherNumber
+                                "attachment_Total": voucher_total,
+                                "bill_amount": voucher_amount,
+                                "voucher_number": voucherNumber
                             },
-
                             "errors": []
                         }
 
                     all_records.append({
 
-                        "hash": str(
-                            uuid.uuid4()
-                        ),
+                        # IMPORTANT:
+                        # DynamoDB key is lowercase "hash"
+                        "hash": str(uuid.uuid4()),
 
                         "Employee_Code": emp,
 
                         "Invoice_No": inv,
 
-                        "Date": str(
-                            invoice_date
-                        ),
+                        "Date": str(invoice_date),
 
                         "Total_Amount": total,
 
@@ -914,50 +678,31 @@ def process_claim(data):
 
             finally:
 
-                if os.path.exists(
-                    path
-                ):
-
-                    os.remove(
-                        path
-                    )
+                if os.path.exists(path):
+                    os.remove(path)
 
         grand_total += voucher_total
 
-    # =========================================================
-    # CLAIM TOTAL VALIDATION
-    # =========================================================
+    # ============== CLAIM TOTAL VALIDATION ==========
 
     if grand_total > total_expected:
 
         return {
-
             "code": 1,
-
-            "status":
-                "CLAIM_TOTAL_MISMATCH",
-
-            "message":
-                "The total amount of attachments exceeds "
-                "the declared claim amount.",
-
+            "status": "CLAIM_TOTAL_MISMATCH",
+            "message": (
+                "The total amount of attachments "
+                "exceeds the declared claim amount."
+            ),
             "data": {
-
                 "claim_id": c_id,
-
-                "attachments_total":
-                    grand_total,
-
-                "expected_total":
-                    total_expected
+                "attachments_total": grand_total,
+                "expected_total": total_expected
             },
-
             "errors": []
         }
 
-    # =========================================================
-    # SAVE DATA
-    # =========================================================
+    # ============== SAVE DATA =======================
 
     insert_into_excel(
         all_records
@@ -968,33 +713,19 @@ def process_claim(data):
     )
 
     return {
-
         "code": 0,
-
-        "status":
-            "SUCCESS",
-
-        "message":
-            "Claim processed successfully.",
-
+        "status": "SUCCESS",
+        "message": "Claim processed successfully.",
         "data": {
-
             "claim_id": c_id,
-
-            "records_saved":
-                len(all_records),
-
-            "total_amount":
-                grand_total
+            "records_saved": len(all_records),
+            "total_amount": grand_total
         },
-
         "errors": []
     }
 
 
-# ============================================================
-# STATUS UPDATE
-# ============================================================
+# ================= STATUS UPDATE ====================
 
 def reject_claim(body):
 
@@ -1014,70 +745,41 @@ def reject_claim(body):
         "Approved"
     ]
 
-    # ========================================================
-    # CLAIM ID VALIDATION
-    # ========================================================
-
     if not claim_id:
 
         return {
-
             "code": 1,
-
-            "status":
-                "VALIDATION_ERROR",
-
-            "message":
-                "Claim_ID is required.",
-
+            "status": "VALIDATION_ERROR",
+            "message": "Claim_ID is required.",
             "data": {},
-
             "errors": [
                 "Missing required field: Claim_ID"
             ]
         }
 
-    # ========================================================
-    # STATUS VALIDATION
-    # ========================================================
-
     if updated_status not in allowed_status:
 
         return {
-
             "code": 1,
-
-            "status":
-                "VALIDATION_ERROR",
-
-            "message":
-                "Invalid status provided.",
-
+            "status": "VALIDATION_ERROR",
+            "message": "Invalid Status.",
             "data": {
-
-                "claim_id":
-                    claim_id
+                "claim_id": claim_id
             },
-
             "errors": [
-
                 f"Invalid Status '{updated_status}'. "
                 f"Allowed values: {allowed_status}"
             ]
         }
 
-    # ========================================================
-    # FIND RECORDS IN DYNAMODB
-    # ========================================================
+    # ============== FIND RECORDS ====================
 
     response = table.scan(
-
-        FilterExpression=
-            Attr(
-                "Claim_ID"
-            ).eq(
-                str(claim_id)
-            )
+        FilterExpression=Attr(
+            "Claim_ID"
+        ).eq(
+            str(claim_id)
+        )
     )
 
     items = response.get(
@@ -1088,29 +790,20 @@ def reject_claim(body):
     if not items:
 
         return {
-
             "code": 1,
-
-            "status":
-                "NOT_FOUND",
-
-            "message":
-                "No records found for the given claim ID.",
-
+            "status": "NOT_FOUND",
+            "message": (
+                "No records found for the given claim ID."
+            ),
             "data": {
-
-                "claim_id":
-                    claim_id
+                "claim_id": claim_id
             },
-
             "errors": []
         }
 
     rows_updated = 0
 
-    # ========================================================
-    # UPDATE STATUS
-    # ========================================================
+    # ============== UPDATE STATUS ===================
 
     for item in items:
 
@@ -1118,24 +811,24 @@ def reject_claim(body):
 
             table.update_item(
 
+                # IMPORTANT:
+                # DynamoDB partition key is lowercase "hash"
                 Key={
                     "hash": item["hash"]
                 },
 
-                UpdateExpression:
-                    "SET #s = :val, Modified_Time = :m",
+                UpdateExpression=(
+                    "SET #s = :val, "
+                    "Modified_Time = :m"
+                ),
 
                 ExpressionAttributeNames={
                     "#s": "Status"
                 },
 
                 ExpressionAttributeValues={
-
-                    ":val":
-                        updated_status,
-
-                    ":m":
-                        get_current_timestamp()
+                    ":val": updated_status,
+                    ":m": get_current_timestamp()
                 }
             )
 
@@ -1148,44 +841,27 @@ def reject_claim(body):
             )
 
     return {
-
         "code": 0,
-
-        "status":
-            "SUCCESS",
-
-        "message":
+        "status": "SUCCESS",
+        "message": (
             f"Claim '{claim_id}' has been successfully "
-            f"updated to '{updated_status}'.",
-
+            f"updated to '{updated_status}'."
+        ),
         "data": {
-
-            "claim_id":
-                claim_id,
-
-            "rows_updated":
-                rows_updated,
-
-            "updated_status":
-                updated_status
+            "claim_id": claim_id,
+            "rows_updated": rows_updated,
+            "updated_status": updated_status
         },
-
         "errors": []
     }
 
 
-# ============================================================
-# FLASK API
-# ============================================================
+# ================= FLASK API =======================
 
 app = Flask(
     __name__
 )
 
-
-# ============================================================
-# PROCESS INVOICE API
-# ============================================================
 
 @app.route(
     "/process-invoice",
@@ -1193,55 +869,31 @@ app = Flask(
 )
 def api():
 
-    # ========================================================
-    # AUTHENTICATION
-    # ========================================================
-
     authenticated_entity = authenticate_request()
 
     if not authenticated_entity:
 
         return jsonify({
-
             "code": 1,
-
-            "error":
-                "Invalid username or password"
-
+            "error": "Invalid username or password"
         }), 401
-
-    # ========================================================
-    # PROCESS CLAIM
-    # ========================================================
 
     try:
 
-        result = process_claim(
-            request.get_json()
-        )
-
         return jsonify(
-            result
+            process_claim(
+                request.get_json()
+            )
         )
 
     except Exception as e:
 
         return jsonify({
-
             "code": 1,
-
-            "status":
-                "ERROR1",
-
-            "message":
-                str(e)
-
+            "status": "ERROR1",
+            "message": str(e)
         })
 
-
-# ============================================================
-# STATUS UPDATE API
-# ============================================================
 
 @app.route(
     "/status-update",
@@ -1249,55 +901,33 @@ def api():
 )
 def reject_api():
 
-    # ========================================================
-    # AUTHENTICATION
-    # ========================================================
-
     authenticated_entity = authenticate_request()
 
     if not authenticated_entity:
 
         return jsonify({
-
             "code": 1,
-
-            "error":
-                "Invalid username or password"
-
+            "error": "Invalid username or password"
         }), 401
-
-    # ========================================================
-    # UPDATE STATUS
-    # ========================================================
 
     try:
 
-        result = reject_claim(
-            request.get_json()
-        )
-
         return jsonify(
-            result
+            reject_claim(
+                request.get_json()
+            )
         )
 
     except Exception as e:
 
         return jsonify({
-
             "code": 1,
-
-            "status":
-                "ERROR1",
-
-            "message":
-                str(e)
-
+            "status": "ERROR1",
+            "message": str(e)
         })
 
 
-# ============================================================
-# APPLICATION START
-# ============================================================
+# ================= APPLICATION START ===============
 
 if __name__ == "__main__":
 
