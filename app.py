@@ -77,6 +77,8 @@ def authenticate_request():
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
+    print(f"UserName : {username} & Password : {password}")
+
     if not username or not password:
         return None
 
@@ -86,11 +88,13 @@ def authenticate_request():
             username,
             credentials["username"]
         )
+        print(f"List User name {credentials["username"]}")
 
         password_match = secrets.compare_digest(
             password,
             credentials["password"]
         )
+        print(f"List Password  {credentials["password"]}")
 
         if username_match and password_match:
             return entity
