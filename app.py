@@ -74,33 +74,44 @@ ENTITY_CREDENTIALS = {
 
 def authenticate_request():
 
+    print("========== AUTH FUNCTION CALLED ==========")
+
     username = request.headers.get("X-Username")
     password = request.headers.get("X-Password")
 
-    print(f"UserName : {username} & Password : {password}")
+    print("Username received:", repr(username))
+    print("Password received:", bool(password))
 
     if not username or not password:
+        print("AUTH FAILED: Username or password missing")
         return None
 
     for entity, credentials in ENTITY_CREDENTIALS.items():
+
+        print("Checking entity:", entity)
 
         username_match = secrets.compare_digest(
             username,
             credentials["username"]
         )
-        print(f"List User name {credentials["username"]}")
 
         password_match = secrets.compare_digest(
             password,
             credentials["password"]
         )
-        print(f"List Password  {credentials["password"]}")
+
+        print("Username match:", username_match)
+        print("Password match:", password_match)
 
         if username_match and password_match:
+
+            print("AUTH SUCCESS:", entity)
+
             return entity
 
-    return None
+    print("AUTH FAILED: No matching credentials")
 
+    return None
 
 # ============================================================
 # EXTERNAL EXTRACTORS
