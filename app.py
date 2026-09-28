@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 
 
 # ============================================================
